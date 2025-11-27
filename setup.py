@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="ost-realsense",
+    name="ost-capture",
     version="0.1",
     packages=find_packages(include=["src", "src.*"]),
     install_requires=[
@@ -13,7 +13,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "ost-realsense=src.cli_entry:main"
+            "ost-capture=src.cli_entry:main"
         ]
     },
 )

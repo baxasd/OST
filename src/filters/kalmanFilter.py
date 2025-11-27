@@ -1,7 +1,7 @@
 import numpy  as np
 from filterpy.kalman import KalmanFilter
 
-class KalmanSmoother:
+class KalmanFilter:
     def __init__(self, num_joints=33, dt=1/30):   
         self.filters = {jid: self._create_filter(dt) for jid in range(num_joints)}
 
