@@ -5,6 +5,7 @@ from datetime import datetime
 class Writer:
     def __init__(self, filename=None, num_joints=33, include_z=True):
         if filename is None:
+            os.makedirs("records", exist_ok=True)
             filename = f"records/joints_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
         self.filename = filename
@@ -13,7 +14,7 @@ class Writer:
 
         file_exists = os.path.exists(filename)
         self.file = open(filename, 'a', newline='')
-        
+
         # Build field names
         self.keys = []
         for i in range(num_joints):
@@ -24,35 +25,28 @@ class Writer:
 
         self.writer = csv.DictWriter(self.file, fieldnames=["timestamp"] + self.keys)
 
-        # Only write header once
         if not file_exists:
             self.writer.writeheader()
 
-    def log(self, joints):
+    def log(self, joints_dict):
         """
-        Expected format:
-        joints = [(x,y,z), (x,y,z), ...]  # len = num_joints
+        Expects a dict: {0: (x,y,z), 1: (x,y,z), ...}
+        Missing joints will be filled with empty values.
         """
-
         row = {"timestamp": datetime.now().isoformat()}
-
-        flat = []
-        for j in joints:
+        for i in range(self.num_joints):
+            j = joints_dict.get(i)
             if j is None:
+                row[f"joint_{i}_x"] = ""
+                row[f"joint_{i}_y"] = ""
                 if self.include_z:
-                    flat.extend(["", "", ""])
-                else:
-                    flat.extend(["", ""])
-                continue
-
-            flat.append(j[0])
-            flat.append(j[1])
-            if self.include_z:
-                flat.append(j[2])
-
-        for k, v in zip(self.keys, flat):
-            row[k] = v
-
+                    row[f"joint_{i}_z"] = ""
+            else:
+                row[f"joint_{i}_x"] = j[0]
+                row[f"joint_{i}_y"] = j[1]
+                if self.include_z:
+                    row[f"joint_{i}_z"] = j[2] if len(j) > 2 else ""
+        
         self.writer.writerow(row)
         self.file.flush()
 

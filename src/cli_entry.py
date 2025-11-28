@@ -13,10 +13,10 @@ def menu():
         choice = input("Select an option: ").strip()
 
         if choice == "1":
-            return run_system(use_kalman=False, model=1)
+            return run_system(kalman=False, model=1)
 
         elif choice == "2":
-            return run_system(use_kalman=True, model=1)
+            return run_system(kalman=True, model=1)
 
         elif choice == "3":
             print("Goodbye.")
@@ -42,6 +42,6 @@ def main():
 
     # Otherwise run normally
     run_system(
-        use_kalman=args.use_kalman,
+        kalman=args.kalman,
         model=args.model
     )

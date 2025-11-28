@@ -1,7 +1,7 @@
 import cv2
 from src.camera.realsense import RealSenseCamera
 from src.pose.pose import PoseEstimator
-from src.filters.kalmanFilter import KalmanFilter
+from src.filters.kalmanFilter import Kalman
 from src.utils.depth import get_mean_depth, deproject
 from src.utils.writer import Writer
 
@@ -13,8 +13,9 @@ def run_system(kalman=True, model=1):
     # Initialize objects
     cam = RealSenseCamera(verbose=True)
     pose_est = PoseEstimator(model)
-    kalman = KalmanFilter() if kalman else None
+    kalman = Kalman() if kalman else None
     logger = Writer()
+
 
     print(f"[INFO] Kalman filter {'ENABLED' if kalman else 'DISABLED'}")
 
@@ -29,7 +30,9 @@ def run_system(kalman=True, model=1):
 
             # Pose estimation
             results = pose_est.estimate(color_image)
-            annotated_image = pose_est.draw_landmarks(color_image, results)
+
+            # If commented out, disables skeleton display
+            #annotated_image = pose_est.draw_landmarks(color_image, results)
 
             landmarks_dict = {}
             if results.pose_landmarks:
@@ -41,6 +44,7 @@ def run_system(kalman=True, model=1):
                     depth = get_mean_depth(depth_frame, px, py, w, h)
                     if depth is None:
                         continue
+                    
 
                     X, Y, Z = deproject(depth_intrin, px, py, depth)
 
@@ -49,15 +53,20 @@ def run_system(kalman=True, model=1):
 
                     landmarks_dict[id] = (X, Y, Z)
 
+                #    cv2.putText(color_image,
+                #                    f"{id}: ({X:.2f},{Y:.2f},{Z:.2f})",
+                #                    (px, py - 10),
+                #                    cv2.FONT_HERSHEY_SIMPLEX,
+                #                    0.4, (0, 255, 255), 1, cv2.LINE_AA)
+                    
+                    
                 # Log raw joint coordinates to CSV
                 logger.log(landmarks_dict)
 
-            # Display skeleton
-            cv2.imshow("3D Pose Skeleton", annotated_image)
-
-            # Exit on ESC
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
+            # Display skeleton, uncomment to enable. Additionally remove comment from annotated_image line above.
+            #cv2.imshow("3D Pose Skeleton", annotated_image)
+            cv2.waitKey(1)
+            
 
     except KeyboardInterrupt:
         print("\n[INFO] Interrupted by user. Shutting down.")

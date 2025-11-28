@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="ost-capture",
     version="0.1",
-    packages=find_packages(include=["src", "src.*"]),
+    packages=find_packages(include=["src", "src.*",]),
     install_requires=[
         "opencv-python",
         "mediapipe",
