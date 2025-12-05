@@ -16,7 +16,7 @@ def main(model=1):
     pose_est = PoseEstimator(model)
     write = Writer()
 
-    # Add before the main loop
+    # Initialize variables
     prev_time = time.time()
     frame_count = 0
     filters = {}
