@@ -7,10 +7,15 @@ filters/__pycache__
 pose/__pycache__
 utils/__pycache__
 __pycache__
+<<<<<<< HEAD
 
 # Python virtual environments
 .venv/
 
 # Ignore VSCode workspace settings
 .vscode/
+=======
+ost_capture.egg-info
+build
+>>>>>>> feature_raw
 
