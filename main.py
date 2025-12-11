@@ -4,7 +4,6 @@ from src.camera.realsense import RealSenseCamera
 from src.pose.pose import PoseEstimator
 from src.utils.depth import get_mean_depth, deproject
 from src.utils.csvWriter import Writer
-from src.utils.one_euro import OneEuroFilter
 
 def main(model=1):
     """Main function to run the system, logging raw joint coordinates only."""
@@ -51,14 +50,7 @@ def main(model=1):
 
                     X, Y, Z = deproject(depth_intrin, px, py, depth)
 
-                    # Initialize filter for joint if not exists
-                    if id not in filters:
-                        filters[id] = OneEuroFilter(freq=30, min_cutoff=1.0, beta=0.2)
-
-                    # Apply filter
-                    smoothed = filters[id]((X, Y, Z))
-
-                    landmarks_dict[id] = tuple(smoothed)
+                    landmarks_dict[id] = (X, Y, Z)
 
                     cv2.putText(color_image,
                                     f"{id}: ({X:.2f},{Y:.2f},{Z:.2f})",
