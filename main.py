@@ -43,7 +43,11 @@ def main(model=1):
                     continue
 
                 X, Y, Z = deproject(depth_intrin, px, py, depth)
-                landmarks_dict[j] = (X, Y, Z)
+
+                landmarks_dict[j] ={
+                    "pixel": (px, py),
+                    "metric": (X, Y, Z)
+                }
 
                 cv2.circle(color_image, (px, py), 3, (0,255,0), -1)
 
