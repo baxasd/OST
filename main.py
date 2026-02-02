@@ -2,7 +2,7 @@ import cv2
 from src.camera.realsense import RealSenseCamera
 from src.pose.pose import PoseEstimator
 from src.utils.depth import get_mean_depth, deproject
-from src.utils.writer import Writer
+from src.utils.csvWriter import Writer
 
 def main(model=1):
     print("[INFO] Initializing camera...")
