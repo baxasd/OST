@@ -2,9 +2,12 @@ import csv
 import os
 from datetime import datetime
 
-
 class Writer:
-    def __init__(self, filename=None, num_joints=33, include_z=True, batch_size=32):
+    def __init__(self, filename=None, num_joints=33, include_z=True, metadata=None):
+        """
+        metadata: dict (optional) - Dictionary of data to save at top of file
+                  e.g., {"Subject": "A1", "Comments": "Walking test"}
+        """
         if filename is None:
             os.makedirs("records", exist_ok=True)
             filename = f"records/joints_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -12,13 +15,21 @@ class Writer:
         self.filename = filename
         self.num_joints = num_joints
         self.include_z = include_z
-        self.batch_size = batch_size
-        self.buffer = []
 
+        # Check if file exists before we open it
         file_exists = os.path.exists(filename)
+        
         self.file = open(filename, 'a', newline='')
 
-        # Build field names
+        # --- 1. Write Metadata (Only if new file) ---
+        if not file_exists and metadata:
+            self.file.write("# SESSION METADATA\n")
+            for key, value in metadata.items():
+                # Write as comments so it doesn't break CSV parsers
+                self.file.write(f"# {key}: {value}\n")
+            self.file.write("# ----------------\n")
+
+        # --- 2. Setup CSV Columns ---
         self.keys = []
         for i in range(num_joints):
             # Pixel space
@@ -36,19 +47,11 @@ class Writer:
             fieldnames=["timestamp"] + self.keys
         )
 
+        # Write header only if file didn't exist
         if not file_exists:
             self.writer.writeheader()
 
     def log(self, joints_dict):
-        """
-        Expects:
-        {
-          joint_id: {
-              "pixel": (px, py),
-              "metric": (x, y, z)
-          }
-        }
-        """
         row = {"timestamp": datetime.now().isoformat()}
 
         for i in range(self.num_joints):
@@ -67,9 +70,12 @@ class Writer:
                 row[f"joint_{i}_z"] = mz if mz is not None else ""
 
         self.writer.writerow(row)
+        
+        # Flush every frame so data isn't lost if crashed
         self.file.flush()
 
     def close(self):
         """Flush remaining data and close the file."""
-        self.flush()
-        self.file.close()
+        if not self.file.closed:
+            self.file.flush() # <--- FIXED: Was self.flush()
+            self.file.close()
