@@ -1,26 +1,27 @@
+# ost/core/transforms.py
 import numpy as np
 import pyrealsense2 as rs
 
 def get_mean_depth(depth_frame, px, py, w, h, patch=1):
+    """Calculates average depth in a small patch around a pixel."""
     try:
-        
         values = []
-        for dx in range(-patch,patch+1):
-            for dy in range(-patch,patch+1):
-                x,y = px+dx,py+dy
+        for dx in range(-patch, patch+1):
+            for dy in range(-patch, patch+1):
+                x, y = px + dx, py + dy
                 if 0 <= x < w and 0 <= y < h:
                     d = depth_frame.get_distance(x, y)
                     if d > 0:
                         values.append(d)
         return np.mean(values) if values else None
     except Exception as e:
-        print("Error getting mean depth:", e)
+        print(f"[WARN] Depth calc error: {e}")
         return None
 
-def deproject(depth_intrin, px, py, depth):
+def deproject_pixel_to_point(depth_intrin, px, py, depth):
+    """Wraps RealSense deprojection to return (x, y, z) in meters."""
     try:
         return rs.rs2_deproject_pixel_to_point(depth_intrin, [px, py], depth)
     except Exception as e:
-        print("Error in deprojection:", e)
+        print(f"[WARN] Deprojection error: {e}")
         return None
-
