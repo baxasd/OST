@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 from datetime import datetime
 
-# Mediapipe Mapping
+# --- MEDIAPIPE CONSTANTS ---
 POSE_LANDMARKS = {
     0: "nose", 1: "left_eye_inner", 2: "left_eye", 3: "left_eye_outer",
     4: "right_eye_inner", 5: "right_eye", 6: "right_eye_outer", 7: "left_ear",
@@ -15,6 +15,13 @@ POSE_LANDMARKS = {
     28: "right_ankle", 29: "left_heel", 30: "right_heel", 31: "left_foot_index",
     32: "right_foot_index"
 }
+
+# Reverse mapping for lookups (Single Source of Truth)
+NAME_TO_ID = {v: k for k, v in POSE_LANDMARKS.items()}
+
+def identify_joint_columns(columns: List[str]) -> List[str]:
+    """Centralized logic to find joint data columns (handles 'j0_x' and 'joint_0_x')."""
+    return [c for c in columns if c.endswith('_x') and (c.startswith('j') or c.startswith('joint'))]
 
 @dataclass
 class Joint:
@@ -61,8 +68,8 @@ def df_to_session(df: pd.DataFrame) -> Session:
     sess = Session(subject_id="Processed", date=str(pd.Timestamp.now()))
     if df.empty: return sess
     
-    # Identify Columns
-    x_cols = [c for c in df.columns if c.endswith('_x') and (c.startswith('j') or c.startswith('joint'))]
+    # Use centralized column logic
+    x_cols = identify_joint_columns(df.columns)
 
     # --- TIMESTAMP FIX ---
     start_time = None
@@ -73,20 +80,15 @@ def df_to_session(df: pd.DataFrame) -> Session:
         ts = 0.0
         
         try:
-            # Case A: String (ISO format from Recorder)
             if isinstance(raw_ts, str):
                 dt = datetime.fromisoformat(raw_ts)
                 if start_time is None: start_time = dt
                 ts = (dt - start_time).total_seconds()
-            
-            # Case B: Float/Int (Already seconds or epoch)
             else:
                 raw_val = float(raw_ts)
                 if start_time is None: start_time = raw_val
                 ts = raw_val - start_time
-
         except Exception:
-            # Fallback if parsing fails totally
             ts = float(i) * 0.033 
 
         f = Frame(timestamp=ts, frame_id=int(i))

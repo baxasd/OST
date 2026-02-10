@@ -2,35 +2,25 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
+from core.data import identify_joint_columns
 
 class PipelineProcessor:
     """
     Logic for validating and cleaning motion data.
-    Handles both 'j0_x' (Recorder) and 'joint_0_x' (Legacy) formats.
     """
     
-    @staticmethod
-    def _get_joint_columns(df):
-        """Helper to find all joint columns regardless of naming convention."""
-        # Pattern 1: j0_x, j0_y...
-        compact = [c for c in df.columns if c.startswith('j') and c[1].isdigit() and c.endswith('_x')]
-        # Pattern 2: joint_0_x...
-        legacy = [c for c in df.columns if c.startswith('joint_') and c.endswith('_x')]
-        return compact + legacy
-
     @staticmethod
     def validate(df: pd.DataFrame):
         """Returns: (report_string, needs_repair_bool)"""
         report = []
         issues = 0
         
-        # 1. Check Structure
-        x_cols = PipelineProcessor._get_joint_columns(df)
+        # 1. Check Structure using centralized logic
+        x_cols = identify_joint_columns(df.columns)
         if not x_cols:
             return "CRITICAL: No joint data found (checked 'j0_x' and 'joint_0_x').", False
             
         # 2. Check Tracking (Zeros)
-        # We need to check the full set of columns (x, y, z)
         all_joint_cols = []
         for c in x_cols:
             base = c[:-2] # remove '_x'
@@ -70,14 +60,12 @@ class PipelineProcessor:
         """Fills gaps where sensor lost tracking."""
         df_clean = df.copy()
         
-        # Find all data columns
-        x_cols = PipelineProcessor._get_joint_columns(df)
+        x_cols = identify_joint_columns(df.columns)
         target_cols = []
         for c in x_cols:
             base = c[:-2]
             target_cols.extend([f"{base}_x", f"{base}_y", f"{base}_z"])
             
-        # Filter valid
         valid_cols = [c for c in target_cols if c in df.columns]
         
         # 1. Treat 0.0 as NaN
@@ -98,13 +86,11 @@ class PipelineProcessor:
     def smooth(df: pd.DataFrame, window=5, poly=2):
         """Applies Savitzky-Golay filter."""
         df_proc = df.copy()
-        x_cols = PipelineProcessor._get_joint_columns(df)
+        x_cols = identify_joint_columns(df.columns)
         
         for c in x_cols:
-            # Extract ID (e.g. 'j0_x' -> 'j0')
             base = c[:-2]
             cols = [f"{base}_{ax}" for ax in ['x', 'y', 'z']]
-            
             if not all(k in df_proc.columns for k in cols): continue
             
             coords = df_proc[cols].values

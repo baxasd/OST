@@ -2,11 +2,10 @@
 import csv
 import os
 import time
+import pandas as pd
 
 class SessionWriter:
     def __init__(self, s, a, metadata=None):
-
-
         os.makedirs("records", exist_ok=True)
         filename = f"records/{s}_{a}_{int(time.time())}.csv"
         
@@ -39,3 +38,14 @@ class SessionWriter:
         if not self.file.closed:
             self.file.flush()
             self.file.close()
+
+def export_clean_csv(df: pd.DataFrame, filepath: str):
+    """
+    Exports a processed DataFrame to CSV.
+    Separates IO logic from the UI.
+    """
+    try:
+        df.to_csv(filepath, index=False)
+        return True, f"Successfully saved to {os.path.basename(filepath)}"
+    except Exception as e:
+        return False, f"Export failed: {str(e)}"
