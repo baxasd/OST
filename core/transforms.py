@@ -5,17 +5,26 @@ import pyrealsense2 as rs
 def get_mean_depth(depth_frame, px, py, w, h, patch=1):
     """Calculates average depth in a small patch around a pixel."""
     try:
+        # --- FIX: Ensure it is a depth frame ---
+        if not depth_frame.is_depth_frame():
+            return None
+        
+        # Cast to depth_frame to access get_distance()
+        depth_frame = depth_frame.as_depth_frame() 
+        
         values = []
         for dx in range(-patch, patch+1):
             for dy in range(-patch, patch+1):
                 x, y = px + dx, py + dy
                 if 0 <= x < w and 0 <= y < h:
+                    # Now this will work
                     d = depth_frame.get_distance(x, y)
                     if d > 0:
                         values.append(d)
         return np.mean(values) if values else None
     except Exception as e:
-        print(f"[WARN] Depth calc error: {e}")
+        # Print once per second max to avoid console spam, or just silence it
+        # print(f"[WARN] Depth calc error: {e}") 
         return None
 
 def deproject_pixel_to_point(depth_intrin, px, py, depth):

@@ -1,13 +1,14 @@
 # ost/core/io.py
 import csv
 import os
-from datetime import datetime
+import time
 
 class SessionWriter:
-    def __init__(self, filename=None, metadata=None):
-        if filename is None:
-            os.makedirs("records", exist_ok=True)
-            filename = f"records/session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    def __init__(self, s, a, metadata=None):
+
+
+        os.makedirs("records", exist_ok=True)
+        filename = f"records/{s}_{a}_{int(time.time())}.csv"
         
         self.filename = filename
         self.file = open(filename, 'a', newline='')
@@ -22,7 +23,7 @@ class SessionWriter:
         # Setup Columns (Standard Mediapipe 33 joints)
         self.keys = ["timestamp"]
         for i in range(33):
-            self.keys.extend([f"j{i}_px", f"j{i}_py", f"j{i}_x", f"j{i}_y", f"j{i}_z"])
+            self.keys.extend([f"j{i}_x", f"j{i}_y", f"j{i}_z"])
 
         self.writer = csv.DictWriter(self.file, fieldnames=self.keys)
         self.writer.writeheader()
