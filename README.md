@@ -1,78 +1,39 @@
-# 🦴 OST – Osteo-Skeletal Tracking
+# OST (Open Source Tracker) V1.0
 
-![OST Logo](./assets/logo_normal.png)
+**Scientific Motion Analysis Suite**
 
-[![Python](https://img.shields.io/badge/python-3.12.3-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE.md)
-[![Mediapipe](https://img.shields.io/badge/mediapipe-0097A7.svg?style=for-the-badge&logo=mediapipe&logoColor=white)](https://ai.google.dev/edge/mediapipe/solutions/guide)
+OST is a modular Python-based workstation designed for capturing, processing, and analyzing biomechanical motion data. It leverages Intel RealSense depth technology and MediaPipe Pose estimation to provide precise, real-time 3D skeletal tracking and scientific metrics.
 
-**OST (Osteo-Skeletal Tracking)** is an experimental framework that combines **Intel RealSense** depth sensing with **MediaPipe Pose** to detect, track, and record human skeletal movement in real time.  
-It serves as a foundation for **motion analysis**, **biomechanics research**, and future **machine learning applications**.
-
----
-
-## 🎯 Project Goals
-- Capture synchronized **color + depth** streams from an Intel RealSense camera.  
-- Apply **MediaPipe Pose** to extract **33 human landmarks**.  
-- Save processed data in **CSV format** for offline analysis.  
-- Provide an **extendable base** for real-time skeleton analytics and visualization.  
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Python](https://img.shields.io/badge/python-3.8%2B-green)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
 
-## 🧩 Tech Stack
-| Component | Purpose |
-|------------|----------|
-| **Python 3.12.3** | Core programming language |
-| **MediaPipe** | Pose estimation / skeleton tracking |
-| **OpenCV** | Frame processing & visualization |
-| **pyrealsense2** | Access Intel RealSense streams |
-| **NumPy & CSV** | Data manipulation and export |
+## 🚀 Key Features
+
+### 1. Data Capture (Recorder)
+* **Hardware Support:** Native integration with Intel RealSense cameras (D400 Series).
+* **Real-time Tracking:** 33-point skeletal tracking using MediaPipe Pose (Lite/Full/Heavy models).
+* **3D Metric Data:** Converts 2D pixel coordinates into real-world 3D metric (meters) using depth deprojection.
+* **Robust Logging:** Saves Session Metadata (Subject ID, Activity, Temperature) automatically.
+
+### 2. Data Studio (Processing)
+* **Automated Diagnostics:** Detects frame drops, tracking loss (zeros), and tracking gaps.
+* **Repair Pipeline:** Smart gap filling using Linear or Spline interpolation.
+* **Signal Smoothing:** Savitzky-Golay filtering to remove jitter while preserving peak magnitudes.
+
+### 3. Visualizer (Analysis)
+* **Scientific Dashboard:** Frame-by-frame analysis with synchronized graphs.
+* **Biomechanics Metrics:** Real-time calculation of:
+    * Trunk Lean (Vertical Reference)
+    * Knee Flexion (Left/Right)
+* **Professional UI:** Dark-themed, high-contrast visualization designed for lab environments.
 
 ---
 
-## ⚙️ Installation
+## 🛠️ Installation
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/baxasd/OST.git
-cd OST
-````
-
-### 2. Create vistual environment and install dependencies
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-> ⚠️ **Note:** Tested only on **Python 3.12.3**. Other versions may not be compatible.
-
-### 3. Install pip package and run
-
-```bash
-pip install .
-ost-realsense -h
-```
-
----
-
-## 📂 Project Structure
-
-```
-OST/
-├─ assets/         # Logos, images
-├─ data/           # CSV exports
-├─ src/            # Core Python scripts
-├─ requirements.txt
-└─ main.py
-```
-
----
-
-## 🚀 Future Enhancements
-
-* Integrate **machine learning models** for activity recognition.
-* Real-time **3D skeleton visualization**.
-* Multi-person tracking support.
-* Export to **other formats** like JSON or Parquet.
+### Prerequisites
+* Python 3.8 or higher
+* Intel RealSense SDK 2.0 (`librealsense`)

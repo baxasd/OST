@@ -324,10 +324,23 @@ class RecorderApp(QMainWindow):
                 self.lbl_video.setPixmap(scaled_pixmap)
 
     def closeEvent(self, event):
-        if self.cam:
-            self.cam.stop()
-        if self.writer: self.writer.close()
-        event.accept()
+            """Safely shuts down hardware before closing."""
+            # 1. Stop the timer IMMEDIATELY so no new frames are requested
+            if hasattr(self, 'timer') and self.timer.isActive():
+                self.timer.stop()
+            
+            # 2. Now it is safe to stop the camera
+            if hasattr(self, 'cam') and self.cam is not None:
+                try:
+                    self.cam.stop()
+                except Exception as e:
+                    print(f"Camera stop error: {e}")
+
+            # 3. Close any open recording sessions
+            if self.writer:
+                self.writer.close()
+                
+            event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

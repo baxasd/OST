@@ -1,0 +1,8 @@
+numpy
+pandas
+scipy
+opencv-python
+mediapipe
+pyqt6
+pyqtgraph
+pyrealsense2
