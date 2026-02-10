@@ -1,141 +1,9 @@
-# ost/core/data.py
 import pandas as pd
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from datetime import datetime
 
-# --- 1. CORE DATA STRUCTURES ---
-
-@dataclass
-class Joint:
-    """Represents a single skeletal joint."""
-    name: str = "unknown"
-    pixel: Tuple[int, int] = (0, 0)       # (x, y) in image coordinates
-    metric: Tuple[float, float, float] = (0.0, 0.0, 0.0) # (x, y, z) in meters
-    visibility: float = 0.0               # 0.0 to 1.0 confidence score
-
-@dataclass
-class Frame:
-    """Represents a single captured moment."""
-    timestamp: float    # Seconds from start (or epoch)
-    frame_id: int
-    joints: Dict[int, Joint] = field(default_factory=dict) # Key is Mediapipe index (0-32)
-
-    def get_joint(self, name_or_idx):
-        """Helper to retrieve a joint by name or index safely."""
-        # Mapping for common names if needed, or direct index access
-        if isinstance(name_or_idx, int):
-            return self.joints.get(name_or_idx)
-        # Add string name lookup here if you implement a name map later
-        return None
-
-@dataclass
-class Session:
-    """Represents a full recording session."""
-    subject_id: str = "Anonymous"
-    date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
-    frames: List[Frame] = field(default_factory=list)
-
-    @property
-    def duration(self):
-        if not self.frames:
-            return 0.0
-        return self.frames[-1].timestamp - self.frames[0].timestamp
-
-# --- 2. THE BRIDGE (Conversion Logic) ---
-
-def session_to_df(session: Session) -> pd.DataFrame:
-    """Converts a Session object into a Pandas DataFrame (Long format for easy analysis)."""
-    rows = []
-    for f in session.frames:
-        # Base row data
-        row_base = {
-            'timestamp': f.timestamp,
-            'frame': f.frame_id
-        }
-        
-        # Flatten joints into columns
-        # Output format: joint_0_x, joint_0_y, joint_0_z ...
-        for j_idx, joint in f.joints.items():
-            # Metric Data (Primary for analysis)
-            row_base[f'joint_{j_idx}_x'] = joint.metric[0]
-            row_base[f'joint_{j_idx}_y'] = joint.metric[1]
-            row_base[f'joint_{j_idx}_z'] = joint.metric[2]
-            
-            # Pixel Data (Useful for overlay debugging)
-            row_base[f'joint_{j_idx}_px'] = joint.pixel[0]
-            row_base[f'joint_{j_idx}_py'] = joint.pixel[1]
-            
-            # Visibility
-            row_base[f'joint_{j_idx}_vis'] = joint.visibility
-            
-        rows.append(row_base)
-    
-    return pd.DataFrame(rows)
-
-def df_to_session(df: pd.DataFrame) -> Session:
-    """
-    Converts a Pandas DataFrame back into a Session object.
-    Robust against missing columns (e.g., if pixel data was dropped during processing).
-    """
-    # Create a new session
-    # You might want to parse real date from metadata if available, defaulting to now
-    sess = Session(subject_id="Processed", date=str(pd.Timestamp.now()))
-    
-    if df.empty:
-        return sess
-
-    # Sort by frame/time to ensure order
-    if 'frame' in df.columns:
-        df = df.sort_values('frame')
-    
-    for _, row in df.iterrows():
-        # 1. Basic Info
-        ts = row.get('timestamp', 0.0)
-        fid = int(row.get('frame', 0))
-        
-        f = Frame(timestamp=ts, frame_id=fid)
-        
-        # 2. Scan columns to reconstruct joints
-        # We look for columns pattern 'joint_{ID}_x' to identify valid joints
-        processed_indices = set()
-        for col in df.columns:
-            if col.startswith('joint_') and col.endswith('_x'):
-                try:
-                    # Extract ID (e.g., "joint_11_x" -> 11)
-                    idx = int(col.split('_')[1])
-                    processed_indices.add(idx)
-                except (ValueError, IndexError):
-                    continue
-        
-        # 3. Populate Joints
-        for idx in processed_indices:
-            # Metric (Required for analysis)
-            mx = row.get(f'joint_{idx}_x', 0.0)
-            my = row.get(f'joint_{idx}_y', 0.0)
-            mz = row.get(f'joint_{idx}_z', 0.0)
-            
-            # Pixel (Optional - might not exist in processed files)
-            px = int(row.get(f'joint_{idx}_px', 0))
-            py = int(row.get(f'joint_{idx}_py', 0))
-            
-            # Visibility (Optional)
-            vis = row.get(f'joint_{idx}_vis', 1.0) # Default to 1.0 if missing
-            
-            f.joints[idx] = Joint(
-                name=str(idx), # Can map to real names later (e.g. "Left Shoulder")
-                pixel=(px, py),
-                metric=(mx, my, mz),
-                visibility=vis
-            )
-            
-        sess.frames.append(f)
-        
-    return sess
-
-# --- 3. HELPER (Optional Name Mapping) ---
-# Useful if you want to access joints by name like 'left_shoulder'
-
+# Mediapipe Mapping
 POSE_LANDMARKS = {
     0: "nose", 1: "left_eye_inner", 2: "left_eye", 3: "left_eye_outer",
     4: "right_eye_inner", 5: "right_eye", 6: "right_eye_outer", 7: "left_ear",
@@ -147,3 +15,96 @@ POSE_LANDMARKS = {
     28: "right_ankle", 29: "left_heel", 30: "right_heel", 31: "left_foot_index",
     32: "right_foot_index"
 }
+
+@dataclass
+class Joint:
+    name: str = "unknown"
+    pixel: Tuple[int, int] = (0, 0)       
+    metric: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    visibility: float = 0.0
+
+@dataclass
+class Frame:
+    timestamp: float
+    frame_id: int
+    joints: Dict[int, Joint] = field(default_factory=dict) 
+
+@dataclass
+class Session:
+    subject_id: str = "Anonymous"
+    date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+    frames: List[Frame] = field(default_factory=list)
+
+    @property
+    def fps(self):
+        if len(self.frames) < 2: return 30.0
+        dur = self.frames[-1].timestamp - self.frames[0].timestamp
+        return len(self.frames) / dur if dur > 0 else 30.0
+
+    @property
+    def duration(self):
+        if not self.frames: return 0.0
+        return self.frames[-1].timestamp - self.frames[0].timestamp
+
+def session_to_df(session: Session) -> pd.DataFrame:
+    rows = []
+    for f in session.frames:
+        row = {'timestamp': f.timestamp, 'frame': f.frame_id}
+        for j_idx, joint in f.joints.items():
+            row[f'j{j_idx}_x'] = joint.metric[0]
+            row[f'j{j_idx}_y'] = joint.metric[1]
+            row[f'j{j_idx}_z'] = joint.metric[2]
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+def df_to_session(df: pd.DataFrame) -> Session:
+    sess = Session(subject_id="Processed", date=str(pd.Timestamp.now()))
+    if df.empty: return sess
+    
+    # Identify Columns
+    x_cols = [c for c in df.columns if c.endswith('_x') and (c.startswith('j') or c.startswith('joint'))]
+
+    # --- TIMESTAMP FIX ---
+    start_time = None
+    
+    for i, row in df.iterrows():
+        # Handle Timestamp (String vs Float)
+        raw_ts = row.get('timestamp', 0.0)
+        ts = 0.0
+        
+        try:
+            # Case A: String (ISO format from Recorder)
+            if isinstance(raw_ts, str):
+                dt = datetime.fromisoformat(raw_ts)
+                if start_time is None: start_time = dt
+                ts = (dt - start_time).total_seconds()
+            
+            # Case B: Float/Int (Already seconds or epoch)
+            else:
+                raw_val = float(raw_ts)
+                if start_time is None: start_time = raw_val
+                ts = raw_val - start_time
+
+        except Exception:
+            # Fallback if parsing fails totally
+            ts = float(i) * 0.033 
+
+        f = Frame(timestamp=ts, frame_id=int(i))
+        
+        for col in x_cols:
+            try:
+                # Parse ID
+                prefix = col[:-2] 
+                if 'joint_' in prefix: idx = int(prefix.split('_')[1])
+                else: idx = int(prefix[1:])
+                
+                mx = float(row.get(f'{prefix}_x', 0.0))
+                my = float(row.get(f'{prefix}_y', 0.0))
+                mz = float(row.get(f'{prefix}_z', 0.0))
+                
+                real_name = POSE_LANDMARKS.get(idx, str(idx))
+                f.joints[idx] = Joint(name=real_name, metric=(mx, my, mz))
+            except: continue
+            
+        sess.frames.append(f)
+    return sess
