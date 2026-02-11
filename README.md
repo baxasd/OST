@@ -5,7 +5,7 @@
 OST is a modular Python-based workstation designed for capturing, processing, and analyzing biomechanical motion data. It leverages Intel RealSense depth technology and MediaPipe Pose estimation to provide precise, real-time 3D skeletal tracking and scientific metrics.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.8%2B-green)
+![Python](https://img.shields.io/badge/python-3.12.3)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
@@ -35,5 +35,5 @@ OST is a modular Python-based workstation designed for capturing, processing, an
 ## 🛠️ Installation
 
 ### Prerequisites
-* Python 3.8 or higher
-* Intel RealSense SDK 2.0 (`librealsense`)
+* Python 3.12.2
+* Intel RealSense SDK 2.0

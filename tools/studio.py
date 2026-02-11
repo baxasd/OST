@@ -1,19 +1,18 @@
 import sys
 import os
 import pandas as pd
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QLabel, QStackedWidget,
-                             QSpinBox, QCheckBox, QFileDialog, QMessageBox, QFrame, QTextEdit, QScrollArea)
+from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QIcon
 import pyqtgraph as pg 
 
 # Core Imports
 from core import data, metrics, processing, io
 from core.visuals import SkeletonDisplay
-# Import Settings (Colors, Dimensions)
 from core.settings import *
 
 # =============================================================================
-#   PAGE 1: DATA STUDIO (Import, Clean, Export)
+#   PAGE 1: DATA STUDIO
 # =============================================================================
 class DataPrepPage(QWidget):
     def __init__(self, parent_app):
@@ -26,7 +25,7 @@ class DataPrepPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # --- LEFT PANEL: Processing Log ---
+        # LEFT PANEL: Processing Log
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
         self.txt_log.setStyleSheet(f"""
@@ -42,7 +41,7 @@ class DataPrepPage(QWidget):
         
         layout.addWidget(self.txt_log, stretch=1)
 
-        # --- RIGHT PANEL: Controls ---
+        # RIGHT PANEL: Controls
         ctrl_panel = QFrame()
         ctrl_panel.setFixedWidth(PANEL_WIDTH)
         ctrl_panel.setStyleSheet(f"background-color: {BG_PANEL}; border-left: 1px solid {BORDER};")
@@ -61,8 +60,7 @@ class DataPrepPage(QWidget):
         self.btn_load.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load.setStyleSheet(f"""
             QPushButton {{ background-color: {ACCENT_COLOR}; color: white; padding: 10px; border: 1px solid {BORDER}; border-radius: 4px; }}
-            QPushButton:hover {{ background-color: {ACCENT_HOVER}; border-color: {TEXT_DIM}; }}
-        """)
+            QPushButton:hover {{ background-color: {ACCENT_HOVER}; border-color: {TEXT_DIM}; }}""")
         ctrl_lay.addWidget(self.btn_load)
         
         self.lbl_file = QLabel("No file selected")
@@ -84,8 +82,7 @@ class DataPrepPage(QWidget):
         self.chk_repair.setStyleSheet(f"""
             QCheckBox {{ color: {TEXT_DIM}; spacing: 8px; border: none; }}
             QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #666; border-radius: 2px; background: transparent; }}
-            QCheckBox::indicator:checked {{ background-color: {ACCENT_COLOR}; border-color: {ACCENT_COLOR}; }}
-        """)
+            QCheckBox::indicator:checked {{ background-color: {ACCENT_COLOR}; border-color: {ACCENT_COLOR}; }}""")
         ctrl_lay.addWidget(self.chk_repair)
         
         # Smoothing Window Control
@@ -97,8 +94,7 @@ class DataPrepPage(QWidget):
         self.spn_win.setRange(3, 51); self.spn_win.setValue(5); self.spn_win.setSingleStep(2)
         self.spn_win.setStyleSheet(f"""
             QSpinBox {{ background-color: #18181b; color: white; border: 1px solid {BORDER}; padding: 4px; border-radius: 4px; }}
-            QSpinBox:focus {{ border: 1px solid {ACCENT_COLOR}; }}
-        """)
+            QSpinBox:focus {{ border: 1px solid {ACCENT_COLOR}; }}""")
         
         smooth_row.addWidget(lbl_smooth)
         smooth_row.addWidget(self.spn_win)
@@ -113,8 +109,7 @@ class DataPrepPage(QWidget):
         self.btn_process.setStyleSheet(f"""
             QPushButton {{ background-color: {ACCENT_COLOR}; color: {BG_DARK}; font-weight: bold; padding: 12px; border: none; border-radius: 4px; }}
             QPushButton:hover {{ background-color: {ACCENT_HOVER}; }}
-            QPushButton:disabled {{ background-color: #3f3f46; color: #71717a; }}
-        """)
+            QPushButton:disabled {{ background-color: #3f3f46; color: #71717a; }}""")
         self.btn_process.setEnabled(False)
         ctrl_lay.addWidget(self.btn_process)
         
@@ -127,8 +122,7 @@ class DataPrepPage(QWidget):
         self.btn_export.setStyleSheet(f"""
             QPushButton {{ background-color: transparent; color: {TEXT_DIM}; border: 1px solid {BORDER}; padding: 10px; border-radius: 4px; }}
             QPushButton:hover {{ border-color: {ACCENT_COLOR}; color: {ACCENT_COLOR}; }}
-            QPushButton:disabled {{ border-color: #333; color: #333; }}
-        """)
+            QPushButton:disabled {{ border-color: #333; color: #333; }}""")
         self.btn_export.setEnabled(False)
         ctrl_lay.addWidget(self.btn_export)
         
@@ -159,12 +153,12 @@ class DataPrepPage(QWidget):
         df = self.raw_df.copy()
         self.log("\n> Processing...")
         
-        # 1. Repair Gaps
+        # Repair Gaps
         if self.chk_repair.isChecked(): 
             df = processing.PipelineProcessor.repair(df)
             self.log("• Gaps interpolated")
             
-        # 2. Smooth Data
+        # Smooth Data
         w = self.spn_win.value()
         if w%2==0: w+=1
         df = processing.PipelineProcessor.smooth(df, window=w)
@@ -194,11 +188,8 @@ class DataPrepPage(QWidget):
 # =============================================================================
 #   CUSTOM UI WIDGETS (Graphs & Legends)
 # =============================================================================
-
 class MetricGraph(QWidget):
-    """
-    Compact line graph with fixed scale, no axis numbers, and clean aesthetic.
-    """
+    """Compact line graph with fixed scale, no axis numbers, and clean aesthetic."""
     def __init__(self, title, color, min_v=0, max_v=180):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -248,9 +239,7 @@ class MetricGraph(QWidget):
         self.v_lbl.setText(f"{int(data_list[-1])}°")
 
 class SkeletonLegend(QFrame):
-    """
-    Simple legend to explain the bone colors.
-    """
+    """Simple legend to explain the bone colors."""
     def __init__(self):
         super().__init__()
         self.setStyleSheet(f"border: none; background: transparent;")
@@ -295,11 +284,11 @@ class VisualizerPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # --- LEFT: 3D Skeleton Viewport ---
+        # LEFT: Skeleton Viewport
         self.viz = SkeletonDisplay()
         layout.addWidget(self.viz, stretch=1)
         
-        # --- RIGHT: Dashboard ---
+        # RIGHT: Dashboard 
         dash_container = QWidget()
         dash_container.setFixedWidth(PANEL_WIDTH)
         # Only Left Border
@@ -320,7 +309,7 @@ class VisualizerPage(QWidget):
         self.grid.setContentsMargins(15, 20, 15, 20)
         self.grid.setSpacing(10)
         
-        # 1. Info Header
+        # Info Header
         self.info_box_widget = QWidget()
         info_lay = QVBoxLayout(self.info_box_widget)
         info_lay.setContentsMargins(0,0,0,10)
@@ -344,12 +333,12 @@ class VisualizerPage(QWidget):
         
         self.grid.addWidget(self.info_box_widget, 0, 0, 1, 2)
         
-        # 2. Legend
+        # Legend
         self.grid.addWidget(SkeletonLegend(), 1, 0, 1, 2)
         
-        # 3. Graphs (Grid Layout)
+        # Graphs (Grid Layout)
         
-        # Row 2: Trunk Leans
+        # Trunk Leans
         self.g_lean_x = MetricGraph("Trunk Lat.", GRAPH_CENTER, -45, 45)
         self.g_lean_z = MetricGraph("Trunk Depth", GRAPH_Z_AXIS, -45, 45)
         self.grid.addWidget(self.g_lean_x, 2, 0)
@@ -379,9 +368,6 @@ class VisualizerPage(QWidget):
         self.grid.addWidget(self.g_lelb, 6, 0)
         self.grid.addWidget(self.g_relb, 6, 1)
         
-        # Spacer
-        self.grid.setRowStretch(7, 1)
-
         scroll.setWidget(scroll_content)
         dash_layout.addWidget(scroll)
         
@@ -513,6 +499,9 @@ class UnifiedWorkstation(QMainWindow):
         # Compact Window Dimensions from Settings
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setStyleSheet(f"QMainWindow {{ background-color: {BG_DARK}; }}")
+
+        if os.path.exists("assets/logo.png"):
+            self.setWindowIcon(QIcon("assets/logo.png"))
         
         # Main Layout
         central = QWidget()
@@ -538,10 +527,16 @@ class UnifiedWorkstation(QMainWindow):
         
         self.btn_prep.clicked.connect(lambda: self.switch_page(0))
         self.btn_viz.clicked.connect(lambda: self.switch_page(1))
+
         
         nav_lay.addWidget(self.btn_prep)
         nav_lay.addWidget(self.btn_viz)
         nav_lay.addStretch()
+
+        l_ver = QLabel(VERSION)
+        l_ver.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none; margin-top: 15px;")
+        l_ver.setAlignment(Qt.AlignmentFlag.AlignRight)
+        nav_lay.addWidget(l_ver)
         
         main_layout.addWidget(nav_bar)
         

@@ -12,7 +12,7 @@ def _get_vec(frame, name_or_id):
         return None
     
     j = frame.joints[idx]
-    # Return 3D vector now (x, y, z) to support depth calculations
+    # Return 3D vector
     return np.array([j.metric[0], j.metric[1], j.metric[2]])
 
 def get_point(f: Frame, name: str):

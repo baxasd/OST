@@ -1,13 +1,13 @@
-# ost/core/settings.py
-
 # --- APP DIMENSIONS ---
-WINDOW_WIDTH = 950
+WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 650
+MIN_WINDOW_WIDTH = 800
+MIN_WINDOW_HEIGHT = 550
 PANEL_WIDTH = 320
 
 # --- UI PALETTE ---
-ACCENT_COLOR = "#D4A24C"      # Gold/Mustard
-ACCENT_HOVER = "#B3863B"      # Darker Gold
+ACCENT_COLOR = "#3b82f6"      # Gold/Mustard
+ACCENT_HOVER = "#2f6dd0"      # Darker Gold
 BG_DARK = "#18181b"           # Zinc 950 (Main Window)
 BG_PANEL = "#27272a"          # Zinc 800 (Side Panel)
 TEXT_MAIN = "#e4e4e7"         # Zinc 200
@@ -15,13 +15,40 @@ TEXT_DIM = "#a1a1aa"          # Zinc 400
 BORDER = "#3f3f46"            # Zinc 700
 
 # --- SKELETON PALETTE (Unique/Lateral) ---
-COLOR_BONE_LEFT = "#ef4444"   # Red (Left Side)
-COLOR_BONE_RIGHT = "#3b82f6"  # Blue (Right Side)
-COLOR_BONE_CENTER = "#ffffff" # White (Spine/Head)
-COLOR_JOINT = "#ffffff"       # White Joints
+COLOR_BONE_LEFT = "#9e2a2b"
+COLOR_BONE_RIGHT = "#2e86c1"
+COLOR_BONE_CENTER = "#7fb069"
+COLOR_JOINT = "#f4e9d8"
 
 # --- GRAPH PALETTE ---
-GRAPH_LEFT = "#ef4444"        # Matches Bone Left
-GRAPH_RIGHT = "#3b82f6"       # Matches Bone Right
+GRAPH_LEFT = "#9e2a2b"        # Matches Bone Left
+GRAPH_RIGHT = "#2e86c1"       # Matches Bone Right
 GRAPH_CENTER = "#fbbf24"      # Amber
-GRAPH_Z_AXIS = "#10b981"      # Emerald
+GRAPH_Z_AXIS = "#7fb069"    # Emerald
+
+# Version
+VERSION = "v0.1.0"
+
+# Recording Settings
+STYLESHEET = """
+QMainWindow { background-color: #2b2b2b; }
+QFrame#Sidebar { background-color: #212121; border-right: 1px solid #3a3a3a; }
+QLabel { color: #e0e0e0; font-family: 'Segoe UI', Arial; }
+QLineEdit { 
+    background-color: #3a3a3a; color: white; border: 1px solid #555; 
+    border-radius: 4px; padding: 4px; font-size: 12px;
+}
+QComboBox { 
+    background-color: #3a3a3a; color: white; border: 1px solid #555; 
+    border-radius: 4px; padding: 4px;
+}
+QComboBox::drop-down { border: none; }
+QPushButton#RecBtn { 
+    background-color: #28a745; color: white; border-radius: 5px; 
+    font-weight: bold; font-size: 14px;
+}
+QPushButton#RecBtn:hover { background-color: #218838; }
+QPushButton#RecBtn:pressed { background-color: #1e7e34; }
+QPushButton#RecBtn[recording="true"] { background-color: #dc3545; }
+QPushButton#RecBtn[recording="true"]:hover { background-color: #c82333; }
+"""

@@ -1,10 +1,9 @@
 import sys
 import os
 import subprocess
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QPushButton, QLabel)
+from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor
+from PyQt6.QtGui import QCursor, QIcon
 
 class OSTLauncher(QMainWindow):
     def __init__(self):
@@ -12,6 +11,8 @@ class OSTLauncher(QMainWindow):
         self.setWindowTitle("OST Suite")
         self.resize(350, 450)
         self.setStyleSheet("QMainWindow { background-color: #2b2b2b; }")
+        if os.path.exists("assets/logo.png"):
+            self.setWindowIcon(QIcon("assets/logo.png"))
         
         central = QWidget()
         self.setCentralWidget(central)
@@ -19,18 +20,18 @@ class OSTLauncher(QMainWindow):
         layout.setContentsMargins(40, 50, 40, 50)
         layout.setSpacing(20)
         
-        # --- HEADER ---
+        # HEADER
         title = QLabel("OST")
         title.setStyleSheet("color: #e5e5e5; font-weight: 900; font-size: 48px; letter-spacing: 4px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         
-        sub = QLabel("SCIENTIFIC MOTION ANALYSIS")
+        sub = QLabel("OSTEO-SKELETAL TRACKER")
         sub.setStyleSheet("color: #777; font-weight: bold; font-size: 10px; letter-spacing: 2px; margin-bottom: 30px;")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(sub)
         
-        # --- ACTIONS ---
+        # ACTIONS
         self.btn_rec = self._make_card("NEW RECORDING", "Capture data from sensor", "#22c55e")
         self.btn_viz = self._make_card("OPEN STUDIO", "Process & Analyze data", "#3b82f6")
         
@@ -42,8 +43,8 @@ class OSTLauncher(QMainWindow):
         
         layout.addStretch()
         
-        # --- FOOTER ---
-        ver = QLabel("v2.1.0 • Stable Build")
+        # FOOTER
+        ver = QLabel("v0.1.0")
         ver.setStyleSheet("color: #444; font-size: 10px;")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(ver)
@@ -86,34 +87,26 @@ class OSTLauncher(QMainWindow):
         return btn
 
     def launch_recorder(self):
-        # Ensure filename matches your file (record.py)
+        # Launch the recording tool (record.py)
         self._run_tool("record.py")
 
     def launch_studio(self):
-        # Ensure filename matches your file (visualize.py or studio.py)
-        # Based on your error log, you might have named it studio.py?
-        # If not, change this string to "visualize.py"
-        target_file = "visualize.py" 
-        if os.path.exists(os.path.join("tools", "studio.py")):
-            target_file = "studio.py"
-            
-        self._run_tool(target_file)
+        # Launch the visualization tool (studio.py)
+        self._run_tool("studio.py")
 
     def _run_tool(self, script_name):
-        # 1. Get the absolute path to the OST root folder
+
+        # Gets the absolute path to the script in the tools folder
         root_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # 2. Get the path to the tool script
         script_path = os.path.join(root_dir, "tools", script_name)
-        
-        # 3. CRITICAL FIX: Add OST root to the PYTHONPATH environment variable
-        # This tells Python: "Look in the OST folder for imports like 'core' and 'sensors'"
+    
+        # Root Folder for PYTHONPATH
         env = os.environ.copy()
         env["PYTHONPATH"] = root_dir + os.pathsep + env.get("PYTHONPATH", "")
 
+        # Check if the script exists before trying to launch it
         if os.path.exists(script_path):
             print(f"Launching {script_name}...")
-            # 4. Pass the modified environment to the new process
             subprocess.Popen([sys.executable, script_path], env=env)
         else:
             print(f"Error: Could not find {script_name} at {script_path}")

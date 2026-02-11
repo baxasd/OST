@@ -1,11 +1,10 @@
-# ost/core/transforms.py
 import numpy as np
 import pyrealsense2 as rs
 
 def get_mean_depth(depth_frame, px, py, w, h, patch=1):
     """Calculates average depth in a small patch around a pixel."""
     try:
-        # --- FIX: Ensure it is a depth frame ---
+        # Ensure it is a depth frame
         if not depth_frame.is_depth_frame():
             return None
         
@@ -23,8 +22,6 @@ def get_mean_depth(depth_frame, px, py, w, h, patch=1):
                         values.append(d)
         return np.mean(values) if values else None
     except Exception as e:
-        # Print once per second max to avoid console spam, or just silence it
-        # print(f"[WARN] Depth calc error: {e}") 
         return None
 
 def deproject_pixel_to_point(depth_intrin, px, py, depth):

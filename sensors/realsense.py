@@ -1,7 +1,6 @@
 # ost/sensors/realsense.py
 import pyrealsense2 as rs
 import numpy as np
-import sys
 
 class RealSenseCamera:
     def __init__(self, width=640, height=480, fps=30):

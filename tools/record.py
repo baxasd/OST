@@ -9,48 +9,26 @@ from sensors.realsense import RealSenseCamera
 from core.transforms import get_mean_depth, deproject_pixel_to_point
 from core.io import SessionWriter
 from core.pose import PoseEstimator
+from core.settings import *
 
 # External Libraries
 import cv2
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QImage, QPixmap, QFont, QIcon
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, 
-                             QComboBox, QFrame, QMessageBox, QSizePolicy)
+from PyQt6.QtWidgets import *
 
-# STYLESHEET Main Style of the App (Dark Theme with Green/Red Accents)
-STYLESHEET = """
-QMainWindow { background-color: #2b2b2b; }
-QFrame#Sidebar { background-color: #212121; border-right: 1px solid #3a3a3a; }
-QLabel { color: #e0e0e0; font-family: 'Segoe UI', Arial; }
-QLineEdit { 
-    background-color: #3a3a3a; color: white; border: 1px solid #555; 
-    border-radius: 4px; padding: 4px; font-size: 12px;
-}
-QComboBox { 
-    background-color: #3a3a3a; color: white; border: 1px solid #555; 
-    border-radius: 4px; padding: 4px;
-}
-QComboBox::drop-down { border: none; }
-QPushButton#RecBtn { 
-    background-color: #28a745; color: white; border-radius: 5px; 
-    font-weight: bold; font-size: 14px;
-}
-QPushButton#RecBtn:hover { background-color: #218838; }
-QPushButton#RecBtn:pressed { background-color: #1e7e34; }
-QPushButton#RecBtn[recording="true"] { background-color: #dc3545; }
-QPushButton#RecBtn[recording="true"]:hover { background-color: #c82333; }
-"""
 
 class RecorderApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OST Recorder")
-        # Ensure you have a logo or remove this line if file is missing
-        if os.path.exists("assets/logo_white.png"):
-            self.setWindowIcon(QIcon("assets/logo_white.png"))
+
+        if os.path.exists("assets/logo.png"):
+            self.setWindowIcon(QIcon("assets/logo.png"))
             
-        self.resize(1024, 600)
-        self.setMinimumSize(800, 520)
+        # Window Sizes defined in settings.py
+        self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
+        self.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         
         # State
         self.is_recording = False
@@ -63,7 +41,7 @@ class RecorderApp(QMainWindow):
         self._init_ui()
         self.setStyleSheet(STYLESHEET)
 
-        # Initialize Hardware (with Retry Loop)
+        # Initialize Hardware
         if not self.connect_camera():
             sys.exit(0) # Exit if user cancelled connection
 
@@ -79,14 +57,15 @@ class RecorderApp(QMainWindow):
         while True:
             try:
                 self.cam = RealSenseCamera(width=640, height=480, fps=30)
-                # Check if pipeline actually started (RealSenseCamera usually prints info)
-                # We can try fetching one frame to be sure
+
+                # Check if pipeline actually started
                 color, _ = self.cam.get_frames()
                 if color is not None:
                     return True
                 else:
                     raise Exception("No frames received")
             except Exception as e:
+
                 # Show Retry Dialog
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Icon.Critical)
@@ -98,7 +77,6 @@ class RecorderApp(QMainWindow):
                 
                 if ret == QMessageBox.StandardButton.Cancel:
                     return False
-                # If Retry, loop runs again
 
     def _init_ui(self):
         # Main Layout
@@ -108,7 +86,7 @@ class RecorderApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- SIDEBAR ---
+        # SIDEBAR 
         self.sidebar = QFrame()
         self.sidebar.setObjectName("Sidebar")
         self.sidebar.setFixedWidth(220)
@@ -171,9 +149,14 @@ class RecorderApp(QMainWindow):
         self.btn_record.clicked.connect(self.toggle_recording)
         side_layout.addWidget(self.btn_record)
 
+        l_ver = QLabel(VERSION)
+        l_ver.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none; margin-top: 15px;")
+        l_ver.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        side_layout.addWidget(l_ver)
+
         main_layout.addWidget(self.sidebar)
 
-        # --- VIDEO AREA ---
+        # VIDEO AREA
         self.video_container = QWidget()
         self.video_container.setStyleSheet("background-color: black;")
         video_layout = QVBoxLayout(self.video_container)
@@ -247,19 +230,19 @@ class RecorderApp(QMainWindow):
             w.setEnabled(enabled)
 
     def update_loop(self):
-            # 1. FPS Calculation
+            # FPS Calculation
             t = time.time()
             dt = t - self.prev_time
             fps = 1.0 / dt if dt > 0 else 0
             self.prev_time = t
             self.lbl_fps.setText(f"FPS: {fps:.1f}")
 
-            # 2. Camera Safety
+            # Camera Safety
             if not self.cam: return
 
             color_img, depth_frame = self.cam.get_frames()
 
-            # --- Reconnection Logic ---
+            # Reconnection Logic
             if color_img is None:
                 self.timer.stop()
                 if self.is_recording: self.toggle_recording()
@@ -273,8 +256,7 @@ class RecorderApp(QMainWindow):
             h, w, _ = color_img.shape
             landmarks = self.pose.estimate(color_img)
             
-            # --- RECORDING LOGIC (FIXED) ---
-            # Initialize frame_data if we are recording, REGARDLESS of detection
+            # Initialize frame_data if we are recording
             frame_data = {}
             depth_intrin = None
             
@@ -286,7 +268,7 @@ class RecorderApp(QMainWindow):
                 if depth_frame:
                     depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
 
-            # If we found a skeleton, add the data to the row
+            # Add the data to the row
             if landmarks:
                 for i, (lx, ly, lz) in enumerate(landmarks):
                     cx, cy = int(lx), int(ly)
@@ -302,14 +284,14 @@ class RecorderApp(QMainWindow):
                                 frame_data[f"j{i}_y"] = p[1]
                                 frame_data[f"j{i}_z"] = p[2]
 
-            # Write to disk if recording (Even if frame_data only has a timestamp!)
+            # Write to disk if recording
             if self.is_recording and self.writer:
                 self.writer.write_frame(frame_data)
                 self.frame_count += 1
                 self.lbl_frames.setText(f"Frames: {self.frame_count}")
                 self.lbl_frames.setStyleSheet("color: #ff5555; font-weight: bold;")
 
-            # --- DISPLAY LOGIC ---
+            # DISPLAY LOGIC
             rgb_image = cv2.cvtColor(color_img, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb_image.shape
             bytes_per_line = ch * w
@@ -325,18 +307,18 @@ class RecorderApp(QMainWindow):
 
     def closeEvent(self, event):
             """Safely shuts down hardware before closing."""
-            # 1. Stop the timer IMMEDIATELY so no new frames are requested
+            # Stop the timer
             if hasattr(self, 'timer') and self.timer.isActive():
                 self.timer.stop()
             
-            # 2. Now it is safe to stop the camera
+            # Stop the camera
             if hasattr(self, 'cam') and self.cam is not None:
                 try:
                     self.cam.stop()
                 except Exception as e:
                     print(f"Camera stop error: {e}")
 
-            # 3. Close any open recording sessions
+            # Close any open recording sessions
             if self.writer:
                 self.writer.close()
                 

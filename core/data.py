@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 from datetime import datetime
 
-# --- MEDIAPIPE CONSTANTS ---
+# MEDIAPIPE CONSTANTS
 POSE_LANDMARKS = {
     0: "nose", 1: "left_eye_inner", 2: "left_eye", 3: "left_eye_outer",
     4: "right_eye_inner", 5: "right_eye", 6: "right_eye_outer", 7: "left_ear",
@@ -71,7 +71,7 @@ def df_to_session(df: pd.DataFrame) -> Session:
     # Use centralized column logic
     x_cols = identify_joint_columns(df.columns)
 
-    # --- TIMESTAMP FIX ---
+    # TIMESTAMP 
     start_time = None
     
     for i, row in df.iterrows():

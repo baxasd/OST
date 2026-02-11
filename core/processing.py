@@ -5,22 +5,19 @@ from scipy.signal import savgol_filter
 from core.data import identify_joint_columns
 
 class PipelineProcessor:
-    """
-    Logic for validating and cleaning motion data.
-    """
-    
+    """ Logic for validating and cleaning motion data"""
     @staticmethod
     def validate(df: pd.DataFrame):
         """Returns: (report_string, needs_repair_bool)"""
         report = []
         issues = 0
         
-        # 1. Check Structure using centralized logic
+        # Check Structure using centralized logic
         x_cols = identify_joint_columns(df.columns)
         if not x_cols:
             return "CRITICAL: No joint data found (checked 'j0_x' and 'joint_0_x').", False
             
-        # 2. Check Tracking (Zeros)
+        # Check Tracking
         all_joint_cols = []
         for c in x_cols:
             base = c[:-2] # remove '_x'
@@ -35,13 +32,13 @@ class PipelineProcessor:
             report.append(f"• Tracking Loss: {pct:.1f}% zeros detected.")
             issues += 1
             
-        # 3. Check Gaps (NaNs)
+        # Check Gaps
         nans = df[existing_cols].isna().sum().sum()
         if nans > 0:
             report.append(f"• Data Gaps: {nans} missing values.")
             issues += 1
 
-        # 4. Check Frame Drops
+        # Check Frame Drops
         if 'frame' in df.columns:
             diffs = df['frame'].diff().fillna(1)
             drops = (diffs > 1).sum()
@@ -68,10 +65,10 @@ class PipelineProcessor:
             
         valid_cols = [c for c in target_cols if c in df.columns]
         
-        # 1. Treat 0.0 as NaN
+        # Treat 0.0 as NaN
         df_clean[valid_cols] = df_clean[valid_cols].replace(0.0, np.nan)
         
-        # 2. Interpolate
+        # Interpolate
         try:
             if method == 'spline':
                 df_clean[valid_cols] = df_clean[valid_cols].interpolate(method='spline', order=3, limit=limit, limit_direction='both')

@@ -1,11 +1,9 @@
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
 from core import metrics
-from core.settings import (BG_DARK, BORDER, COLOR_JOINT, 
-                           COLOR_BONE_LEFT, COLOR_BONE_RIGHT, COLOR_BONE_CENTER)
+from core.settings import *
 
-# --- CONFIGURATION ---
-
+# CONFIGURATION
 VISIBLE_NAMES = [
     "nose", 
     "left_shoulder", "right_shoulder",
@@ -16,7 +14,7 @@ VISIBLE_NAMES = [
     "left_ankle", "right_ankle"
 ]
 
-# List of bone connections (Simple list, logic handles color)
+# List of bone connections
 BONES_LIST = [
     ("hip_mid", "shoulder_mid"),         # Spine
     ("hip_mid", "left_hip"),             # Pelvis L
@@ -61,7 +59,7 @@ class SkeletonDisplay(pg.PlotWidget):
     def update_frame(self, f):
         if not f: return
         
-        # --- DRAW BONES ---
+        # DRAW BONES
         for (n1, n2) in BONES_LIST:
             p1 = metrics.get_point(f, n1)
             p2 = metrics.get_point(f, n2)
@@ -69,7 +67,6 @@ class SkeletonDisplay(pg.PlotWidget):
             if p1 and p2:
                 key = f"{n1}_{n2}"
                 
-                # --- UNIQUE COLOR LOGIC ---
                 # Default to Center
                 c = COLOR_BONE_CENTER
                 
@@ -85,7 +82,7 @@ class SkeletonDisplay(pg.PlotWidget):
                 
                 self.bones[key].setData([p1[0], p2[0]], [-p1[1], -p2[1]])
 
-        # --- DRAW JOINTS ---
+        # DRAW JOINTS
         xs, ys = [], []
         for name in VISIBLE_NAMES:
             p = metrics.get_point(f, name) 

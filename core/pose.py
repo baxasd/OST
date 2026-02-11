@@ -1,7 +1,5 @@
-# ost/core/pose.py
 import cv2
 import mediapipe as mp
-import numpy as np
 
 class PoseEstimator:
     """
