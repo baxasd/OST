@@ -52,3 +52,6 @@ QPushButton#RecBtn:pressed { background-color: #1e7e34; }
 QPushButton#RecBtn[recording="true"] { background-color: #dc3545; }
 QPushButton#RecBtn[recording="true"]:hover { background-color: #c82333; }
 """
+
+# History of Line Graphs
+MAX_HISTORY_LENGTH = 40

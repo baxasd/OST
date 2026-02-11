@@ -485,7 +485,7 @@ class VisualizerPage(QWidget):
 
     def _update_graph(self, graph, key, val):
         self.history[key].append(val)
-        if len(self.history[key]) > 100: self.history[key].pop(0)
+        if len(self.history[key]) > MAX_HISTORY_LENGTH: self.history[key].pop(0)
         graph.update_data(self.history[key])
 
 
