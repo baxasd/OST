@@ -55,3 +55,26 @@ QPushButton#RecBtn[recording="true"]:hover { background-color: #c82333; }
 
 # History of Line Graphs
 MAX_HISTORY_LENGTH = 40
+
+import sys
+import os
+
+def get_base_path():
+    """Returns the base directory whether frozen or script."""
+    if getattr(sys, 'frozen', False):
+        # In frozen mode, assets are usually in the internal temporary folder
+        return sys._MEIPASS
+    else:
+        # In dev mode, return the project root
+        # This file is in ost/core/, so we go up two levels
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+BASE_DIR = get_base_path()
+
+# Define Paths
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+ICON = os.path.join(ASSETS_DIR, "logo.png")
+
+# Configs
+APP_NAME = "OST Suite"
+VERSION = "0.1.0"

@@ -500,8 +500,8 @@ class UnifiedWorkstation(QMainWindow):
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setStyleSheet(f"QMainWindow {{ background-color: {BG_DARK}; }}")
 
-        if os.path.exists("assets/logo.png"):
-            self.setWindowIcon(QIcon("assets/logo.png"))
+        if os.path.exists(ICON):
+            self.setWindowIcon(QIcon(ICON))
         
         # Main Layout
         central = QWidget()

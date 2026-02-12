@@ -6,4 +6,4 @@ utils/__pycache__
 __pycache__
 ost_capture.egg-info
 build
-
+dist

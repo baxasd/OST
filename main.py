@@ -5,14 +5,22 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor, QIcon
 
+# Ensure we can find core if running as script
+if not getattr(sys, 'frozen', False):
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from core.settings import ICON
+
 class OSTLauncher(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OST Suite")
         self.resize(350, 450)
         self.setStyleSheet("QMainWindow { background-color: #2b2b2b; }")
-        if os.path.exists("assets/logo.png"):
-            self.setWindowIcon(QIcon("assets/logo.png"))
+        
+        # Icon Setup
+        if os.path.exists(ICON):
+            self.setWindowIcon(QIcon(ICON))
         
         central = QWidget()
         self.setCentralWidget(central)
@@ -87,30 +95,40 @@ class OSTLauncher(QMainWindow):
         return btn
 
     def launch_recorder(self):
-        # Launch the recording tool (record.py)
-        self._run_tool("record.py")
+        self._run_tool("record")
 
     def launch_studio(self):
-        # Launch the visualization tool (studio.py)
-        self._run_tool("studio.py")
+        self._run_tool("studio")
 
-    def _run_tool(self, script_name):
-
-        # Gets the absolute path to the script in the tools folder
-        root_dir = os.path.dirname(os.path.abspath(__file__))
-        script_path = os.path.join(root_dir, "tools", script_name)
-    
-        # Root Folder for PYTHONPATH
-        env = os.environ.copy()
-        env["PYTHONPATH"] = root_dir + os.pathsep + env.get("PYTHONPATH", "")
-
-        # Check if the script exists before trying to launch it
-        if os.path.exists(script_path):
-            print(f"Launching {script_name}...")
-            subprocess.Popen([sys.executable, script_path], env=env)
+    def _run_tool(self, tool_name):
+        """Launches tools as Scripts (Dev) or Executables (Release)."""
+        is_frozen = getattr(sys, 'frozen', False)
+        
+        if is_frozen:
+            # --- RELEASE MODE ---
+            # Use sys.executable to find the folder where the .exe lives
+            base_dir = os.path.dirname(sys.executable)
+            exe_path = os.path.join(base_dir, f"{tool_name}.exe")
+            
+            if os.path.exists(exe_path):
+                # Detach process so Launcher can close without killing tool
+                subprocess.Popen([exe_path])
+            else:
+                QMessageBox.critical(self, "Error", f"Missing executable:\n{exe_path}")
+        
         else:
-            print(f"Error: Could not find {script_name} at {script_path}")
-            print("Please check that the file exists in the 'tools' folder.")
+            # --- DEV MODE ---
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            script_path = os.path.join(base_dir, "tools", f"{tool_name}.py")
+            
+            # Setup path so tools can find 'core'
+            env = os.environ.copy()
+            env["PYTHONPATH"] = base_dir + os.pathsep + env.get("PYTHONPATH", "")
+            
+            if os.path.exists(script_path):
+                subprocess.Popen([sys.executable, script_path], env=env)
+            else:
+                print(f"Error: Missing script at {script_path}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

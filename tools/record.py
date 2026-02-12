@@ -23,8 +23,8 @@ class RecorderApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("OST Recorder")
 
-        if os.path.exists("assets/logo.png"):
-            self.setWindowIcon(QIcon("assets/logo.png"))
+        if os.path.exists(ICON):
+            self.setWindowIcon(QIcon(ICON))
             
         # Window Sizes defined in settings.py
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
