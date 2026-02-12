@@ -184,4 +184,5 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name=APP_NAME,
+    contents_directory='core'
 )

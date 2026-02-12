@@ -1,11 +1,10 @@
-# OST (Open Source Tracker) V1.0
-
+# OST
 **Scientific Motion Analysis Suite**
 
 OST is a modular Python-based workstation designed for capturing, processing, and analyzing biomechanical motion data. It leverages Intel RealSense depth technology and MediaPipe Pose estimation to provide precise, real-time 3D skeletal tracking and scientific metrics.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.12.3)
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Python](https://img.shields.io/badge/python-3.12.3-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
