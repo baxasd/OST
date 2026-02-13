@@ -584,6 +584,11 @@ class UnifiedWorkstation(QMainWindow):
         super().keyPressEvent(event)
 
 if __name__ == "__main__":
+    try:
+        import pyi_splash # type: ignore
+        pyi_splash.close()
+    except ImportError:
+        pass
     app = QApplication(sys.argv)
     w = UnifiedWorkstation()
     w.show()

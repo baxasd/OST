@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import os
+import mediapipe  # <--- Import this to find the path
 from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
@@ -10,67 +11,55 @@ ost_root = os.path.abspath(os.getcwd())
 sys.path.append(ost_root)
 from core.settings import APP_NAME, ICON
 
-exe_icon_path = ICON
-if exe_icon_path and exe_icon_path.endswith('.png'):
-    possible_ico = exe_icon_path.replace('.png', '.ico')
-    if os.path.exists(possible_ico):
-        exe_icon_path = possible_ico
-
-if not os.path.exists(exe_icon_path):
-    exe_icon_path = None
-
-# --- 2. CONFLICT RESOLUTION FUNCTION ---
+# --- 2. CONFLICT RESOLUTION ---
 def deduplicate_binaries(bin_list):
-    """
-    Filters out duplicate DLLs.
-    Keeps the FIRST occurrence of any filename.
-    """
     seen = set()
     unique = []
     for src, dest in bin_list:
-        # Normalize destination to filename to catch conflicts
         file_name = os.path.basename(src).lower()
         if file_name in seen:
-            print(f"[-] Dropping duplicate binary to prevent conflict: {file_name}")
             continue
         seen.add(file_name)
         unique.append((src, dest))
     return unique
 
-# --- 3. COLLECT DEPENDENCIES ---
+# --- 3. COLLECT DEPENDENCIES (BRUTE FORCE METHOD) ---
 extra_datas = [('assets', 'assets')]
 
-# A. Collect MediaPipe FIRST (Priority High)
-# We want MediaPipe's version of OpenCV DLLs to win.
-mp_datas, mp_binaries, mp_hidden = collect_all('mediapipe')
+# Find actual MediaPipe path on disk
+mp_path = os.path.dirname(mediapipe.__file__)
 
-# B. Collect RealSense
+# FORCE COPY: Map local 'site-packages/mediapipe' -> frozen 'mediapipe'
+# This ensures 'mediapipe.python' exists because we are copying the files manually.
+extra_datas.append((mp_path, 'mediapipe'))
+
+# Collect Binaries (DLLs)
+mp_datas_auto, mp_binaries, mp_hidden = collect_all('mediapipe')
 rs_datas, rs_binaries, rs_hidden = collect_all('pyrealsense2')
-
-# C. Collect OpenCV (Priority Low)
-# If MediaPipe already provided an opencv dll, we discard the one from here.
 cv_datas, cv_binaries, cv_hidden = collect_all('cv2')
 
 # --- 4. MERGE & FILTER ---
-# Order matters here! mp_binaries must be first for the deduplicator to keep them.
+# Merge binaries (MP first to win conflicts)
 raw_binaries = mp_binaries + rs_binaries + cv_binaries
 final_binaries = deduplicate_binaries(raw_binaries)
 
-final_datas = extra_datas + mp_datas + rs_datas + cv_datas
+# Merge Datas (Our manual copy + others)
+final_datas = extra_datas + rs_datas + cv_datas 
+# Note: We excluded mp_datas_auto because we are manually copying the whole folder
 
-# Add specific hidden imports that MediaPipe C++ often misses
-final_hidden = mp_hidden + rs_hidden + cv_hidden + [
-    'sensors.realsense', 
-    'core.io', 
-    'core.pose', 
-    'core.transforms', 
-    'core.settings', 
-    'mediapipe.python._framework_bindings',
+final_hidden = rs_hidden + cv_hidden + [
+    'sensors.realsense', 'core.io', 'core.pose', 'core.transforms', 'core.settings',
+    # Critical imports
+    'mediapipe', 
+    'mediapipe.python',
     'mediapipe.python.solution_base',
+    'mediapipe.python.solutions',
     'google.protobuf'
 ]
 
-# --- BUILD: RECORDER ---
+# =========================================================
+# BUILD: RECORDER
+# =========================================================
 a_rec = Analysis(
     ['tools/record.py'],
     pathex=[ost_root],
@@ -87,9 +76,22 @@ a_rec = Analysis(
     noarchive=False,
 )
 pyz_rec = PYZ(a_rec.pure, a_rec.zipped_data, cipher=block_cipher)
+
+splash_rec = Splash(
+    'assets/splash.png',
+    binaries=a_rec.binaries,
+    datas=a_rec.datas,
+    text_pos=None,
+    text_size=12,
+    minify_script=True,
+    always_on_top=True,
+)
+
 exe_rec = EXE(
     pyz_rec,
     a_rec.scripts,
+    splash_rec,
+    splash_rec.binaries,
     [],
     exclude_binaries=True,
     name='record',
@@ -97,11 +99,14 @@ exe_rec = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Keep True for debugging errors
-    icon=exe_icon_path
+    console=False,
+    icon=ICON,
+    contents_directory='libs' 
 )
 
-# --- BUILD: STUDIO ---
+# =========================================================
+# BUILD: STUDIO
+# =========================================================
 a_stu = Analysis(
     ['tools/studio.py'], 
     pathex=[ost_root],
@@ -118,9 +123,22 @@ a_stu = Analysis(
     noarchive=False,
 )
 pyz_stu = PYZ(a_stu.pure, a_stu.zipped_data, cipher=block_cipher)
+
+splash_stu = Splash(
+    'assets/splash.png',
+    binaries=a_stu.binaries,
+    datas=a_stu.datas,
+    text_pos=None,
+    text_size=12,
+    minify_script=True,
+    always_on_top=True,
+)
+
 exe_stu = EXE(
     pyz_stu,
     a_stu.scripts,
+    splash_stu,
+    splash_stu.binaries,
     [],
     exclude_binaries=True,
     name='studio',
@@ -129,10 +147,14 @@ exe_stu = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon=exe_icon_path
+    icon=ICON,
+    contents_directory='libs' 
+
 )
 
-# --- BUILD: LAUNCHER ---
+# =========================================================
+# BUILD: LAUNCHER
+# =========================================================
 a_main = Analysis(
     ['main.py'],
     pathex=[ost_root],
@@ -149,6 +171,7 @@ a_main = Analysis(
     noarchive=False,
 )
 pyz_main = PYZ(a_main.pure, a_main.zipped_data, cipher=block_cipher)
+
 exe_main = EXE(
     pyz_main,
     a_main.scripts,
@@ -160,10 +183,11 @@ exe_main = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon=exe_icon_path
+    icon=ICON,
+    contents_directory='libs' 
 )
 
-# --- MERGE ---
+# --- MERGE ALL ---
 coll = COLLECT(
     exe_main,
     a_main.binaries,
@@ -184,5 +208,5 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name=APP_NAME,
-    contents_directory='core'
+    contents_directory='libs' 
 )

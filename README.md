@@ -1,5 +1,5 @@
 # OST
-**Scientific Motion Analysis Suite**
+**OSTEO-SKELETAL TRACKING Suite**
 
 OST is a modular Python-based workstation designed for capturing, processing, and analyzing biomechanical motion data. It leverages Intel RealSense depth technology and MediaPipe Pose estimation to provide precise, real-time 3D skeletal tracking and scientific metrics.
 

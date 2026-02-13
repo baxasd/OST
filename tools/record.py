@@ -325,6 +325,11 @@ class RecorderApp(QMainWindow):
             event.accept()
 
 if __name__ == "__main__":
+    try:
+        import pyi_splash # type: ignore
+        pyi_splash.close()
+    except ImportError:
+        pass
     app = QApplication(sys.argv)
     window = RecorderApp()
     window.show()

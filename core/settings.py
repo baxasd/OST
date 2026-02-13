@@ -73,7 +73,7 @@ BASE_DIR = get_base_path()
 
 # Define Paths
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
-ICON = os.path.join(ASSETS_DIR, "logo.png")
+ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
 
 # Configs
 APP_NAME = "OST Suite"
