@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 import os
-import mediapipe  # <--- Import this to find the path
+import mediapipe  # <--- Required to locate the package
 from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
@@ -13,6 +13,10 @@ from core.settings import APP_NAME, ICON
 
 # --- 2. CONFLICT RESOLUTION ---
 def deduplicate_binaries(bin_list):
+    """
+    Prevents DLL Hell by keeping only the first occurrence of any DLL.
+    Critical for OpenCV + MediaPipe + RealSense conflicts.
+    """
     seen = set()
     unique = []
     for src, dest in bin_list:
@@ -23,33 +27,30 @@ def deduplicate_binaries(bin_list):
         unique.append((src, dest))
     return unique
 
-# --- 3. COLLECT DEPENDENCIES (BRUTE FORCE METHOD) ---
+# --- 3. COLLECT DEPENDENCIES ---
 extra_datas = [('assets', 'assets')]
 
-# Find actual MediaPipe path on disk
+# A. BRUTE FORCE: Map actual MediaPipe folder to frozen app
+# This fixes "ModuleNotFoundError: mediapipe.python"
 mp_path = os.path.dirname(mediapipe.__file__)
-
-# FORCE COPY: Map local 'site-packages/mediapipe' -> frozen 'mediapipe'
-# This ensures 'mediapipe.python' exists because we are copying the files manually.
 extra_datas.append((mp_path, 'mediapipe'))
 
-# Collect Binaries (DLLs)
+# B. Collect dependencies via PyInstaller hooks
 mp_datas_auto, mp_binaries, mp_hidden = collect_all('mediapipe')
 rs_datas, rs_binaries, rs_hidden = collect_all('pyrealsense2')
 cv_datas, cv_binaries, cv_hidden = collect_all('cv2')
 
 # --- 4. MERGE & FILTER ---
-# Merge binaries (MP first to win conflicts)
+# MediaPipe binaries MUST come first to win conflicts
 raw_binaries = mp_binaries + rs_binaries + cv_binaries
 final_binaries = deduplicate_binaries(raw_binaries)
 
-# Merge Datas (Our manual copy + others)
+# Combine datas (excluding mp_datas_auto because we manually copied it)
 final_datas = extra_datas + rs_datas + cv_datas 
-# Note: We excluded mp_datas_auto because we are manually copying the whole folder
 
 final_hidden = rs_hidden + cv_hidden + [
     'sensors.realsense', 'core.io', 'core.pose', 'core.transforms', 'core.settings',
-    # Critical imports
+    # Critical Explicit Imports
     'mediapipe', 
     'mediapipe.python',
     'mediapipe.python.solution_base',
@@ -65,10 +66,11 @@ a_rec = Analysis(
     pathex=[ost_root],
     binaries=final_binaries,
     datas=final_datas,
+    # CRITICAL FIX: The Runtime Hook
+    runtime_hooks=['core/hook_fix.py'],
     hiddenimports=final_hidden,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -99,9 +101,8 @@ exe_rec = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
-    icon=ICON,
-    contents_directory='libs' 
+    console=True, # Keep True for debugging
+    icon=ICON
 )
 
 # =========================================================
@@ -112,10 +113,11 @@ a_stu = Analysis(
     pathex=[ost_root],
     binaries=final_binaries,
     datas=final_datas,
+    # CRITICAL FIX: The Runtime Hook
+    runtime_hooks=['core/hook_fix.py'],
     hiddenimports=final_hidden + ['core.data', 'core.metrics', 'core.processing'],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -147,9 +149,7 @@ exe_stu = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon=ICON,
-    contents_directory='libs' 
-
+    icon=ICON
 )
 
 # =========================================================
@@ -163,7 +163,6 @@ a_main = Analysis(
     hiddenimports=['core.paths', 'core.settings'],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -183,8 +182,7 @@ exe_main = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon=ICON,
-    contents_directory='libs' 
+    icon=ICON
 )
 
 # --- MERGE ALL ---
@@ -208,5 +206,6 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name=APP_NAME,
+    # This organizes all libs into a specific folder
     contents_directory='libs' 
 )
