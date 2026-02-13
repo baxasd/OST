@@ -16,7 +16,7 @@ POSE_LANDMARKS = {
     32: "right_foot_index"
 }
 
-# Reverse mapping for lookups (Single Source of Truth)
+# Reverse mapping for lookups
 NAME_TO_ID = {v: k for k, v in POSE_LANDMARKS.items()}
 
 def identify_joint_columns(columns: List[str]) -> List[str]:
@@ -110,3 +110,11 @@ def df_to_session(df: pd.DataFrame) -> Session:
             
         sess.frames.append(f)
     return sess
+
+def pd_to_df(filename) -> pd.DataFrame:
+    try:
+        df = pd.read_csv(filename, comment='#')
+        return df
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        return pd.DataFrame()

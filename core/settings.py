@@ -6,8 +6,8 @@ MIN_WINDOW_HEIGHT = 550
 PANEL_WIDTH = 320
 
 # --- UI PALETTE ---
-ACCENT_COLOR = "#3b82f6"      # Gold/Mustard
-ACCENT_HOVER = "#2f6dd0"      # Darker Gold
+ACCENT_COLOR = "#0FA6C1"      # Cyan Accent (Used for Highlights & Buttons)
+ACCENT_HOVER = "#167B87"      # Darker Cyan (Hover State)
 BG_DARK = "#18181b"           # Zinc 950 (Main Window)
 BG_PANEL = "#27272a"          # Zinc 800 (Side Panel)
 TEXT_MAIN = "#e4e4e7"         # Zinc 200
@@ -74,7 +74,11 @@ BASE_DIR = get_base_path()
 # Define Paths
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
+COMMAND_ICON = os.path.join(ASSETS_DIR, "command.ico")
+LOGO = os.path.join(ASSETS_DIR, "logo-main-whiteText.png")
+
+
 
 # Configs
 APP_NAME = "OST Suite"
-VERSION = "0.1.0"
+VERSION = "V0.1.0"

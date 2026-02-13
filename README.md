@@ -1,38 +1,118 @@
-# OST
-**OSTEO-SKELETAL TRACKING Suite**
+# OST Suite 
 
-OST is a modular Python-based workstation designed for capturing, processing, and analyzing biomechanical motion data. It leverages Intel RealSense depth technology and MediaPipe Pose estimation to provide precise, real-time 3D skeletal tracking and scientific metrics.
+<p align="left"><img src="assets/logo-main-transp.png" alt="OST Suite Logo" width="250"></p>
+
+#### Osteo-Skeletal Tracker
+
+A portable, modular workstation for recording, processing, and visualizing skeletal motion data using Intel RealSense and MediaPipe.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
-![Python](https://img.shields.io/badge/python-3.12.3-green)
+![Python](https://img.shields.io/badge/python-3.11-green)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10.21-teal)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
 
-## 🚀 Key Features
+## 🛠 Features
 
-### 1. Data Capture (Recorder)
-* **Hardware Support:** Native integration with Intel RealSense cameras (D400 Series).
-* **Real-time Tracking:** 33-point skeletal tracking using MediaPipe Pose (Lite/Full/Heavy models).
-* **3D Metric Data:** Converts 2D pixel coordinates into real-world 3D metric (meters) using depth deprojection.
-* **Robust Logging:** Saves Session Metadata (Subject ID, Activity, Temperature) automatically.
+### 📷 OST Recorder
 
-### 2. Data Studio (Processing)
-* **Automated Diagnostics:** Detects frame drops, tracking loss (zeros), and tracking gaps.
-* **Repair Pipeline:** Smart gap filling using Linear or Spline interpolation.
-* **Signal Smoothing:** Savitzky-Golay filtering to remove jitter while preserving peak magnitudes.
+* Auto-detects Intel RealSense cameras
+* Real-time skeletal overlay (MediaPipe Pose)
+* Depth-aligned 3D coordinate export
 
-### 3. Visualizer (Analysis)
-* **Scientific Dashboard:** Frame-by-frame analysis with synchronized graphs.
-* **Biomechanics Metrics:** Real-time calculation of:
-    * Trunk Lean (Vertical Reference)
-    * Knee Flexion (Left/Right)
-* **Professional UI:** Dark-themed, high-contrast visualization designed for lab environments.
+### 📊 OST Studio
+
+**Data Prep**
+
+* Auto-repair gaps using interpolation
+* Smooth jittery skeletal data
+
+**Visualizer**
+
+* Interactive 3D skeleton playback
+* Synchronized metric graphs (Flexion, Trunk Lean, etc.)
+
+### 📦 Portable
+
+Runs as a standalone application.
 
 ---
 
-## 🛠️ Installation
+## 📥 Installation
 
-### Prerequisites
-* Python 3.12.2
-* Intel RealSense SDK 2.0
+### For Users (Lab Machines)
+
+1. Download the latest **Release** from the repository sidebar.
+2. Extract the ZIP file.
+3. Open the folder and run **OST Launcher.exe**.
+
+**Note:**
+If the app fails to start, ensure the Microsoft Visual C++ Redistributable is installed.
+
+---
+
+### For Developers
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/OST-Suite.git
+cd OST-Suite
+```
+
+#### 2. Create a Virtual Environment
+
+```bash
+python -m venv .venv
+.\venv\Scripts\activate
+```
+
+#### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 4. Run in Development Mode
+
+```bash
+python main.py
+```
+---
+
+## 🏗️ Building From Source
+
+This project uses a custom PyInstaller setup.
+
+### 1. The Build System
+
+The build is controlled by `studio.spec`
+
+* **Runtime Hooks (`core/hook_fix.py`)**
+  Workaround for the known issue with MediaPipe libraries. Prevents crash caused by DLL load conflict
+
+* **Manifest Injection**
+  Can be changed if build for Linux machines
+
+* **Folder Cleanup**
+  Hides internal executables and libraries inside a `libs/` folder.
+
+---
+
+### 2. Build Command
+
+To generate a fresh executable:
+
+```bash
+# 1. Clean previous builds
+rmdir /s /q build dist
+
+# 2. Run the spec file
+pyinstaller studio.spec
+```
+The output will be located in:
+
+```dist/OST Suite```
+
+---

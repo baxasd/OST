@@ -1,18 +1,14 @@
 import sys
 import os
-import pandas as pd
+import traceback
+
+# FAST IMPORTS
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
-import pyqtgraph as pg 
-
-# Core Imports
-from core import data, metrics, processing, io
-from core.visuals import SkeletonDisplay
 from core.settings import *
 
-# =============================================================================
-#   PAGE 1: DATA STUDIO
+#   PAGE 1: DATA STUDIO 
 # =============================================================================
 class DataPrepPage(QWidget):
     def __init__(self, parent_app):
@@ -136,7 +132,11 @@ class DataPrepPage(QWidget):
             self.txt_log.clear()
             self.log(f"> Loaded: {os.path.basename(fn)}")
             try:
-                self.raw_df = pd.read_csv(fn)
+                # LAZY IMPORT CORE
+                self.log("...Initializing Data Engine...")
+                from core import processing, data
+
+                self.raw_df = data.pd_to_df(fn)
                 report, needs_repair = processing.PipelineProcessor.validate(self.raw_df)
                 self.log(report)
                 
@@ -150,6 +150,10 @@ class DataPrepPage(QWidget):
 
     def run_pipeline(self):
         if self.raw_df is None: return
+        
+        # LAZY IMPORT
+        from core import processing, data
+        
         df = self.raw_df.copy()
         self.log("\n> Processing...")
         
@@ -167,6 +171,8 @@ class DataPrepPage(QWidget):
         self.clean_df = df
         self.log(f"> Done. Frames: {len(df)}")
         self.btn_export.setEnabled(True)
+        
+        # Pass to visualizer
         self.parent_app.load_data_into_viz(self.clean_df)
         
         # Ask to switch tabs
@@ -179,6 +185,8 @@ class DataPrepPage(QWidget):
 
     def export_file(self):
         if self.clean_df is None: return
+        # LAZY IMPORT
+        from core import io
         fn, _ = QFileDialog.getSaveFileName(self, "Save", "clean.csv", "CSV (*.csv)")
         if fn:
             success, msg = io.export_clean_csv(self.clean_df, fn)
@@ -189,14 +197,16 @@ class DataPrepPage(QWidget):
 #   CUSTOM UI WIDGETS (Graphs & Legends)
 # =============================================================================
 class MetricGraph(QWidget):
-    """Compact line graph with fixed scale, no axis numbers, and clean aesthetic."""
+    """Compact line graph with fixed scale. Wrapper to delay pg import."""
     def __init__(self, title, color, min_v=0, max_v=180):
         super().__init__()
+
+        import pyqtgraph as pg 
+        
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 15) # Spacing below widget
+        layout.setContentsMargins(0, 0, 0, 15) 
         layout.setSpacing(4)
         
-        # Header Row (Title & Value)
         header = QHBoxLayout()
         t_lbl = QLabel(title.upper())
         t_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 9px; font-weight: bold; border: none;")
@@ -208,7 +218,6 @@ class MetricGraph(QWidget):
         header.addWidget(self.v_lbl)
         layout.addLayout(header)
         
-        # Graph Container
         self.box = QFrame()
         self.box.setFixedHeight(80) 
         self.box.setStyleSheet(f"background-color: {BG_DARK}; border: 1px solid {BORDER}; border-radius: 4px;")
@@ -217,17 +226,12 @@ class MetricGraph(QWidget):
         
         self.plot = pg.PlotWidget()
         self.plot.setBackground(None)
-        
-        # Clean up Plot: Hide axes, show faint grid
         self.plot.hideAxis('bottom')
         self.plot.hideAxis('left')
         self.plot.showGrid(x=True, y=True, alpha=0.2)
         self.plot.setMouseEnabled(x=False, y=False)
-        
-        # Fixed Range (No Auto-Scaling)
         self.plot.setYRange(min_v, max_v, padding=0.1)
         
-        # Line Curve
         self.curve = self.plot.plot(pen=pg.mkPen(color, width=2))
         
         box_lay.addWidget(self.plot)
@@ -239,7 +243,6 @@ class MetricGraph(QWidget):
         self.v_lbl.setText(f"{int(data_list[-1])}°")
 
 class SkeletonLegend(QFrame):
-    """Simple legend to explain the bone colors."""
     def __init__(self):
         super().__init__()
         self.setStyleSheet(f"border: none; background: transparent;")
@@ -263,7 +266,7 @@ class SkeletonLegend(QFrame):
 
 
 # =============================================================================
-#   PAGE 2: VISUALIZER (Playback & Metrics)
+#   PAGE 2: VISUALIZER
 # =============================================================================
 class VisualizerPage(QWidget):
     def __init__(self):
@@ -272,32 +275,50 @@ class VisualizerPage(QWidget):
         self.frame_idx = 0
         self.playing = False
         
-        # Metrics History
-        self.keys = ['lean_x', 'lean_z', 
-                     'l_knee', 'r_knee', 
-                     'l_hip', 'r_hip', 
-                     'l_sho', 'r_sho', 
-                     'l_elb', 'r_elb']
+        self.keys = ['lean_x', 'lean_z', 'l_knee', 'r_knee', 'l_hip', 'r_hip', 'l_sho', 'r_sho', 'l_elb', 'r_elb']
         self.history = {k: [] for k in self.keys}
         
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        # Main Layout
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+        
+        # PLACEHOLDER 
+        self.loading_lbl = QLabel("Initializing Graphics Engine...")
+        self.loading_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.loading_lbl.setStyleSheet(f"color: {TEXT_DIM};")
+        self.layout.addWidget(self.loading_lbl)
+        
+        # Variables to hold widgets later
+        self.viz = None
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.loop)
+        self.is_initialized = False
+
+    def init_graphics(self):
+        """Called by Main App AFTER window is shown."""
+        if self.is_initialized: return
+        
+        # LAZY IMPORTS
+        import pyqtgraph as pg
+        from core.visuals import SkeletonDisplay
+        from core import metrics
+        
+        # Clear Placeholder
+        self.loading_lbl.setParent(None)
         
         # LEFT: Skeleton Viewport
         self.viz = SkeletonDisplay()
-        layout.addWidget(self.viz, stretch=1)
+        self.layout.addWidget(self.viz, stretch=1)
         
         # RIGHT: Dashboard 
         dash_container = QWidget()
         dash_container.setFixedWidth(PANEL_WIDTH)
-        # Only Left Border
         dash_container.setStyleSheet(f"background-color: {BG_PANEL}; border: none; border-left: 1px solid {BORDER};")
         
         dash_layout = QVBoxLayout(dash_container)
         dash_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Scrollable Content Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; } QScrollBar { width: 8px; background: #222; }")
@@ -332,37 +353,29 @@ class VisualizerPage(QWidget):
         add_info("Frames", "lbl_frames")
         
         self.grid.addWidget(self.info_box_widget, 0, 0, 1, 2)
-        
-        # Legend
         self.grid.addWidget(SkeletonLegend(), 1, 0, 1, 2)
         
-        # Graphs (Grid Layout)
-        
-        # Trunk Leans
+        # Graphs
         self.g_lean_x = MetricGraph("Trunk Lat.", GRAPH_CENTER, -45, 45)
         self.g_lean_z = MetricGraph("Trunk Depth", GRAPH_Z_AXIS, -45, 45)
         self.grid.addWidget(self.g_lean_x, 2, 0)
         self.grid.addWidget(self.g_lean_z, 2, 1)
         
-        # Row 3: Knees
         self.g_lknee = MetricGraph("L.Knee Flex", GRAPH_LEFT, 0, 180)
         self.g_rknee = MetricGraph("R.Knee Flex", GRAPH_RIGHT, 0, 180)
         self.grid.addWidget(self.g_lknee, 3, 0)
         self.grid.addWidget(self.g_rknee, 3, 1)
         
-        # Row 4: Hips
         self.g_lhip = MetricGraph("L.Hip Flex", GRAPH_LEFT, 0, 180)
         self.g_rhip = MetricGraph("R.Hip Flex", GRAPH_RIGHT, 0, 180)
         self.grid.addWidget(self.g_lhip, 4, 0)
         self.grid.addWidget(self.g_rhip, 4, 1)
         
-        # Row 5: Shoulders
         self.g_lsho = MetricGraph("L.Shoulder Flex", GRAPH_LEFT, 0, 180)
         self.g_rsho = MetricGraph("R.Shoulder Flex", GRAPH_RIGHT, 0, 180)
         self.grid.addWidget(self.g_lsho, 5, 0)
         self.grid.addWidget(self.g_rsho, 5, 1)
         
-        # Row 6: Elbows
         self.g_lelb = MetricGraph("L.Elbow Flex", GRAPH_LEFT, 0, 180)
         self.g_relb = MetricGraph("R.Elbow Flex", GRAPH_RIGHT, 0, 180)
         self.grid.addWidget(self.g_lelb, 6, 0)
@@ -371,7 +384,7 @@ class VisualizerPage(QWidget):
         scroll.setWidget(scroll_content)
         dash_layout.addWidget(scroll)
         
-        # --- FOOTER ---
+        # Footer
         footer = QFrame()
         footer.setStyleSheet(f"background-color: {BG_PANEL}; border-top: 1px solid {BORDER}; border-left: none; border-right: none; border-bottom: none;")
         f_lay = QVBoxLayout(footer)
@@ -387,7 +400,6 @@ class VisualizerPage(QWidget):
         instr.setAlignment(Qt.AlignmentFlag.AlignCenter)
         f_lay.addWidget(instr)
         
-        # Load Recording Button (Accent Color)
         self.btn_load_ext = QPushButton("LOAD RECORDING")
         self.btn_load_ext.clicked.connect(self.load_external)
         self.btn_load_ext.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -398,12 +410,14 @@ class VisualizerPage(QWidget):
         f_lay.addWidget(self.btn_load_ext)
         
         dash_layout.addWidget(footer)
-        layout.addWidget(dash_container)
+        self.layout.addWidget(dash_container)
         
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.loop)
+        self.is_initialized = True
 
     def load_session(self, session, filename=""):
+        if not self.is_initialized: return
+        from core import metrics # Lazy import ensure
+        
         self.active_session = session
         self.frame_idx = 0
         self.history = {k: [] for k in self.keys}
@@ -435,20 +449,25 @@ class VisualizerPage(QWidget):
             self.viz.update_frame(first_frame)
 
     def load_external(self):
+        # LAZY IMPORT PANDAS
+        from core import data
+        
         fn, _ = QFileDialog.getOpenFileName(self, "Open CSV", "", "CSV (*.csv)")
         if fn:
             try:
-                df = pd.read_csv(fn)
+                df = data.pd_to_df(fn)
                 session = data.df_to_session(df)
                 self.load_session(session, fn)
             except Exception as e: QMessageBox.critical(self, "Error", str(e))
 
     def toggle_play(self):
+        if not self.is_initialized: return
         self.playing = not self.playing
         if self.playing: self.timer.start()
         else: self.timer.stop()
         
     def step(self, delta):
+        if not self.is_initialized: return
         self.playing = False
         self.timer.stop()
         if not self.active_session: return
@@ -457,25 +476,22 @@ class VisualizerPage(QWidget):
 
     def loop(self, update_idx=True):
         if not self.active_session or not self.active_session.frames: return
+
+        from core import metrics # Ensure import
+        
         f = self.active_session.frames[self.frame_idx]
         self.viz.update_frame(f)
         
-        # Calculate all metrics using centralized logic
         vals = metrics.compute_all_metrics(f)
 
-        # Update Graphs
         self._update_graph(self.g_lean_x, 'lean_x', vals['lean_x'])
         self._update_graph(self.g_lean_z, 'lean_z', vals['lean_z'])
-        
         self._update_graph(self.g_lknee, 'l_knee', vals['l_knee'])
         self._update_graph(self.g_rknee, 'r_knee', vals['r_knee'])
-        
         self._update_graph(self.g_lhip, 'l_hip', vals['l_hip'])
         self._update_graph(self.g_rhip, 'r_hip', vals['r_hip'])
-        
         self._update_graph(self.g_lsho, 'l_sho', vals['l_sho'])
         self._update_graph(self.g_rsho, 'r_sho', vals['r_sho'])
-        
         self._update_graph(self.g_lelb, 'l_elb', vals['l_elb'])
         self._update_graph(self.g_relb, 'r_elb', vals['r_elb'])
         
@@ -496,7 +512,6 @@ class UnifiedWorkstation(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OST Studio")
-        # Compact Window Dimensions from Settings
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setStyleSheet(f"QMainWindow {{ background-color: {BG_DARK}; }}")
 
@@ -527,7 +542,6 @@ class UnifiedWorkstation(QMainWindow):
         
         self.btn_prep.clicked.connect(lambda: self.switch_page(0))
         self.btn_viz.clicked.connect(lambda: self.switch_page(1))
-
         
         nav_lay.addWidget(self.btn_prep)
         nav_lay.addWidget(self.btn_viz)
@@ -543,13 +557,27 @@ class UnifiedWorkstation(QMainWindow):
         # STACKED PAGES
         self.stack = QStackedWidget()
         self.page_prep = DataPrepPage(self)
-        self.page_viz = VisualizerPage()
+        self.page_viz = VisualizerPage() 
         
         self.stack.addWidget(self.page_prep)
         self.stack.addWidget(self.page_viz)
         
         main_layout.addWidget(self.stack)
         self.switch_page(0)
+
+        # Boot Heavy Systems 100ms after Window shows
+        QTimer.singleShot(100, self.boot_heavy_systems)
+
+    def boot_heavy_systems(self):
+        """Loads Pandas, PyQtGraph, and Core Logic in the background"""
+        try:
+
+            # This triggers the heavy imports inside VisualizerPage
+            self.page_viz.init_graphics()
+            
+        except Exception as e:
+            if pyi_splash: pyi_splash.close()
+            traceback.print_exc()
 
     def _nav_btn(self, text):
         btn = QPushButton(text)
@@ -571,6 +599,8 @@ class UnifiedWorkstation(QMainWindow):
         self.switch_page(1)
 
     def load_data_into_viz(self, df):
+        # LAZY IMPORT
+        from core import data
         session = data.df_to_session(df)
         self.page_viz.load_session(session, "Clean_Data.csv")
 
@@ -584,12 +614,16 @@ class UnifiedWorkstation(QMainWindow):
         super().keyPressEvent(event)
 
 if __name__ == "__main__":
+    # SPLASH
     try:
         import pyi_splash # type: ignore
-        pyi_splash.close()
     except ImportError:
-        pass
+        pyi_splash = None
     app = QApplication(sys.argv)
     w = UnifiedWorkstation()
+
+    if pyi_splash and pyi_splash.is_alive():
+        pyi_splash.close()
+           
     w.show()
     sys.exit(app.exec())

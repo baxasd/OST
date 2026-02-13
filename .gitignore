@@ -1,9 +1,25 @@
-.venv
-camera/__pycache__
-filters/__pycache__
-pose/__pycache__
-utils/__pycache__
-__pycache__
-ost_capture.egg-info
-build
-dist
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / Build
+build/
+dist/
+*.spec
+
+# Virtual Environments
+venv/
+env/
+.env
+
+# PyInstaller
+*.manifest
+
+# IDEs
+.vscode/
+.idea/
+
+# Local Data
+*.csv
+*.bag
