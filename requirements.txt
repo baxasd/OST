@@ -1,0 +1,15 @@
+# Core UI & Visualization
+PyQt6
+pyqtgraph
+
+# Computer Vision & Hardware
+opencv-python
+pyrealsense2
+mediapipe>=0.10.21
+
+# Data Processing & Storage
+numpy
+pandas
+
+# Build System
+pyinstaller
