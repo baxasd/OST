@@ -1,6 +1,7 @@
 import sys
 import os
 import traceback
+import json
 
 # FAST IMPORTS
 from PyQt6.QtWidgets import *
@@ -8,6 +9,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
 from core.settings import *
 
+# =============================================================================
 #   PAGE 1: DATA STUDIO 
 # =============================================================================
 class DataPrepPage(QWidget):
@@ -127,16 +129,27 @@ class DataPrepPage(QWidget):
     def log(self, text): self.txt_log.append(str(text))
 
     def load_file(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Open CSV", "", "CSV (*.csv)")
+        fn, _ = QFileDialog.getOpenFileName(self, "Open Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             self.txt_log.clear()
             self.log(f"> Loaded: {os.path.basename(fn)}")
             try:
-                # LAZY IMPORT CORE
                 self.log("...Initializing Data Engine...")
                 from core import processing, data
+                import pandas as pd
 
-                self.raw_df = data.pd_to_df(fn)
+                if fn.endswith('.parquet'):
+                    import pyarrow.parquet as pq
+                    # Peek at metadata instantly
+                    schema = pq.read_schema(fn)
+                    if schema.metadata and b'session_meta' in schema.metadata:
+                        meta = json.loads(schema.metadata[b'session_meta'].decode())
+                        self.log(f">> Metadata Found: Subject {meta.get('Subject', 'Unknown')}, Temp {meta.get('Temp', 'N/A')}C")
+                    
+                    self.raw_df = pd.read_parquet(fn)
+                else:
+                    self.raw_df = data.pd_to_df(fn)
+
                 report, needs_repair = processing.PipelineProcessor.validate(self.raw_df)
                 self.log(report)
                 
@@ -414,7 +427,7 @@ class VisualizerPage(QWidget):
         
         self.is_initialized = True
 
-    def load_session(self, session, filename=""):
+    def load_session(self, session, filename="", subj="Unknown", act="Unknown"):
         if not self.is_initialized: return
         from core import metrics # Lazy import ensure
         
@@ -422,8 +435,7 @@ class VisualizerPage(QWidget):
         self.frame_idx = 0
         self.history = {k: [] for k in self.keys}
         
-        subj, act = "Unknown", "Unknown"
-        if filename:
+        if subj == "Unknown" and filename:
             parts = os.path.basename(filename).split('_')
             if len(parts) >= 2:
                 subj, act = parts[0], parts[1]
@@ -452,12 +464,30 @@ class VisualizerPage(QWidget):
         # LAZY IMPORT PANDAS
         from core import data
         
-        fn, _ = QFileDialog.getOpenFileName(self, "Open CSV", "", "CSV (*.csv)")
+        fn, _ = QFileDialog.getOpenFileName(self, "Open Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             try:
-                df = data.pd_to_df(fn)
+                import pandas as pd
+                subj, act = "Unknown", "Unknown"
+                
+                if fn.endswith('.parquet'):
+                    import pyarrow.parquet as pq
+                    
+                    # 1. Instantly read Metadata from Footer
+                    schema = pq.read_schema(fn)
+                    if schema.metadata:
+                        if b'subject_id' in schema.metadata:
+                            subj = schema.metadata[b'subject_id'].decode()
+                        if b'activity' in schema.metadata:
+                            act = schema.metadata[b'activity'].decode()
+                            
+                    # 2. Load the actual data
+                    df = pd.read_parquet(fn)
+                else:
+                    df = pd.read_csv(fn)
+                    
                 session = data.df_to_session(df)
-                self.load_session(session, fn)
+                self.load_session(session, fn, subj, act)
             except Exception as e: QMessageBox.critical(self, "Error", str(e))
 
     def toggle_play(self):
