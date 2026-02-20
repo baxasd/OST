@@ -9,7 +9,7 @@ from PyQt6.QtGui import QCursor, QIcon, QPixmap
 if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.settings import ICON, VERSION, LOGO
+from core.common.settings import ICON, VERSION, LOGO
 
 class OSTLauncher(QMainWindow):
     def __init__(self):

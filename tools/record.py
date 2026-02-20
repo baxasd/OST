@@ -5,14 +5,13 @@ import time
 import datetime
 import traceback
 # import mediapipe as mp ### ONLY FOR SCRIPTING TO PREVENT BINDING ISSUES.
-
+import mediapipe as mp
 
 # UI Imports ONLY
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QImage, QPixmap, QFont, QIcon
 from PyQt6.QtWidgets import *
-from core.settings import * 
-
+from core.common.settings import * 
 class RecorderApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -56,9 +55,9 @@ class RecorderApp(QMainWindow):
             
             import cv2
             from sensors.realsense import RealSenseCamera
-            from core.transforms import get_mean_depth, deproject_pixel_to_point
-            from core.io import SessionWriter
-            from core.pose import PoseEstimator
+            from core.recorder.transforms import get_mean_depth, deproject_pixel_to_point
+            from core.common.io import SessionWriter  # Now imports the Parquet chunked writer
+            from core.recorder.pose import PoseEstimator
             
             self.lbl_video.setText("Connecting to Camera...")
             QApplication.processEvents() # Force UI update
@@ -188,7 +187,7 @@ class RecorderApp(QMainWindow):
         video_layout = QVBoxLayout(self.video_container)
         video_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.lbl_video = QLabel("Initializing...") # Changed text
+        self.lbl_video = QLabel("Initializing...")
         self.lbl_video.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         video_layout.addWidget(self.lbl_video)
@@ -203,7 +202,6 @@ class RecorderApp(QMainWindow):
         return inp
 
     def change_model(self, index):
-
         # Must check if pose is loaded
         if self.pose:
             self.pose = PoseEstimator(model_complexity=index)
@@ -221,6 +219,7 @@ class RecorderApp(QMainWindow):
                 return
             self.lbl_error.setText("")
 
+            # This metadata will now be embedded in the Parquet footer
             meta = {"Subject": s, "Activity": a, "Temp": t, "Date": datetime.datetime.now().isoformat()}
             
             try:
@@ -249,7 +248,6 @@ class RecorderApp(QMainWindow):
             w.setEnabled(enabled)
 
     def update_loop(self):
-
         if not self.cam or not self.pose:
             return
 
@@ -297,6 +295,7 @@ class RecorderApp(QMainWindow):
                                 frame_data[f"j{i}_z"] = p[2]
 
             if self.is_recording and self.writer:
+                # Hands off the dictionary to the Parquet SessionWriter buffer
                 self.writer.write_frame(frame_data)
                 self.frame_count += 1
                 self.lbl_frames.setText(f"Frames: {self.frame_count}")

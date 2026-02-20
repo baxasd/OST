@@ -27,7 +27,7 @@ GRAPH_CENTER = "#fbbf24"      # Amber
 GRAPH_Z_AXIS = "#7fb069"    # Emerald
 
 # Version
-VERSION = "v0.1.0"
+VERSION = "v0.2.0"
 
 # Recording Settings
 STYLESHEET = """
@@ -67,7 +67,7 @@ def get_base_path():
     else:
         # In dev mode, return the project root
         # This file is in ost/core/, so we go up two levels
-        return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 BASE_DIR = get_base_path()
 

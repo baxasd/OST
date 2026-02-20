@@ -16,9 +16,14 @@ class SessionWriter:
         self.filepath = f"records/{s}_{a}_{timestamp}.parquet"
         
         self.data_buffer = []
-        self.chunk_size = 300  # Flush to disk every 300 frames (~10 seconds at 30fps)
+        self.chunk_size = 100  # Flush to disk every ~10 seconds
         self.writer = None
         self.total_frames = 0
+        
+        # --- THE FIX: Define strict column schema ---
+        self.schema_columns = ['timestamp']
+        for i in range(33):
+            self.schema_columns.extend([f"j{i}_x", f"j{i}_y", f"j{i}_z"])
 
     def write_frame(self, frame_data: dict):
         """Appends to buffer. Flushes to disk if buffer reaches chunk_size."""
@@ -33,11 +38,11 @@ class SessionWriter:
         if not self.data_buffer:
             return
             
-        df = pd.DataFrame(self.data_buffer)
+        # --- THE FIX: Force Pandas to use the exact column structure ---
+        df = pd.DataFrame(self.data_buffer, columns=self.schema_columns)
         table = pa.Table.from_pandas(df)
         
         # If this is the FIRST chunk, we must initialize the Parquet Writer
-        # because we need the data schema to embed our metadata.
         if self.writer is None:
             custom_meta = {
                 b"subject_id": str(self.subject_id).encode(),
@@ -57,7 +62,7 @@ class SessionWriter:
         # Write the chunk to disk
         self.writer.write_table(table)
         
-        # CRITICAL: Empty the memory buffer!
+        # Empty the memory buffer!
         self.data_buffer.clear()
 
     def close(self):
@@ -71,12 +76,51 @@ class SessionWriter:
             print("No data recorded.")
 
 def export_clean_csv(df: pd.DataFrame, filepath: str):
-    """
-    Exports a processed DataFrame to CSV.
-    Separates IO logic from the UI.
-    """
+    """Exports a processed DataFrame to CSV."""
     try:
         df.to_csv(filepath, index=False)
         return True, f"Successfully saved to {os.path.basename(filepath)}"
     except Exception as e:
         return False, f"Export failed: {str(e)}"
+    
+
+def load_session_data(filepath: str):
+    """
+    Universal loader for OST session data.
+    Abstracts file formats (Parquet/CSV) away from the UI.
+    
+    Returns:
+        tuple: (pd.DataFrame, subject_id, activity)
+    """
+    import pandas as pd
+    import os
+    
+    subj, act = "Unknown", "Unknown"
+
+    if filepath.endswith('.parquet'):
+        import pyarrow.parquet as pq
+        
+        # 1. Instantly read Metadata from Footer
+        schema = pq.read_schema(filepath)
+        if schema.metadata:
+            if b'subject_id' in schema.metadata:
+                subj = schema.metadata[b'subject_id'].decode()
+            if b'activity' in schema.metadata:
+                act = schema.metadata[b'activity'].decode()
+                
+        # 2. Load Data
+        df = pd.read_parquet(filepath)
+
+    elif filepath.endswith('.csv'):
+        # 1. Load Data
+        df = pd.read_csv(filepath)
+        
+        # 2. Fallback Metadata: Extract from filename
+        clean_name = os.path.basename(filepath).replace('.csv', '')
+        parts = clean_name.split('_')
+        if len(parts) >= 2:
+            subj, act = parts[0], parts[1]
+    else:
+        raise ValueError(f"Unsupported file format: {filepath}")
+
+    return df, subj, act
