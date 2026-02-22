@@ -1,7 +1,7 @@
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
-from core import metrics
-from core.settings import *
+from core.studio import metrics
+from core.common.settings import *
 
 # CONFIGURATION
 VISIBLE_NAMES = [

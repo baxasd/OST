@@ -1,8 +1,7 @@
 # ost/core/processing.py
 import pandas as pd
 import numpy as np
-from scipy.signal import savgol_filter
-from core.data import identify_joint_columns
+from core.common.data import identify_joint_columns
 
 class PipelineProcessor:
     """ Logic for validating and cleaning motion data"""
@@ -53,6 +52,36 @@ class PipelineProcessor:
             return header + "\n" + "\n".join(report), True
 
     @staticmethod
+    def remove_teleportation(df: pd.DataFrame, threshold=0.5):
+        """
+        Calculates 3D Euclidean distance between consecutive frames.
+        If a joint jumps more than the threshold, it is replaced with NaN.
+        """
+        df_clean = df.copy()
+        x_cols = identify_joint_columns(df_clean.columns)
+        
+        teleports_found = 0
+        
+        for c in x_cols:
+            base = c[:-2]
+            cols = [f"{base}_x", f"{base}_y", f"{base}_z"]
+            if not all(k in df_clean.columns for k in cols): continue
+            
+            # Calculate distance moved since last frame
+            diffs = df_clean[cols].diff()
+            # Euclidean distance: sqrt(x^2 + y^2 + z^2)
+            dists = np.sqrt((diffs**2).sum(axis=1))
+            
+            # Find indices where the jump is too large
+            jump_idx = dists > threshold
+            teleports_found += jump_idx.sum()
+            
+            # Nullify those coordinates
+            df_clean.loc[jump_idx, cols] = np.nan
+            
+        return df_clean, teleports_found
+
+    @staticmethod
     def repair(df: pd.DataFrame, method='linear', limit=30):
         """Fills gaps where sensor lost tracking."""
         df_clean = df.copy()
@@ -80,22 +109,19 @@ class PipelineProcessor:
         return df_clean.fillna(0.0)
 
     @staticmethod
-    def smooth(df: pd.DataFrame, window=5, poly=2):
-        """Applies Savitzky-Golay filter."""
+    def smooth(df: pd.DataFrame, window=5):
+        """Applies a simple Moving Average filter."""
         df_proc = df.copy()
         x_cols = identify_joint_columns(df.columns)
         
+        all_joint_cols = []
         for c in x_cols:
             base = c[:-2]
             cols = [f"{base}_{ax}" for ax in ['x', 'y', 'z']]
-            if not all(k in df_proc.columns for k in cols): continue
+            all_joint_cols.extend([k for k in cols if k in df_proc.columns])
             
-            coords = df_proc[cols].values
-            for axis in range(3):
-                try:
-                    coords[:, axis] = savgol_filter(coords[:, axis], window, poly)
-                except ValueError: pass
-            
-            df_proc[cols] = coords
+        if all_joint_cols:
+            # Use Pandas rolling mean for pure moving average
+            df_proc[all_joint_cols] = df_proc[all_joint_cols].rolling(window=window, min_periods=1, center=True).mean()
             
         return df_proc
