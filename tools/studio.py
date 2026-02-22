@@ -1,25 +1,22 @@
 import sys
 import os
 import traceback
-import json
 
-# FAST IMPORTS
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
+
 from core.common import data, io
 from core.common.settings import *
+from core.studio.ui_components import MetricGraph, SkeletonLegend
 
-# =============================================================================
-#   PAGE 1: DATA STUDIO 
-# =============================================================================
+
 class DataPrepPage(QWidget):
     def __init__(self, parent_app):
         super().__init__()
         self.parent_app = parent_app
         self.raw_df = None
         self.clean_df = None
-        
         self.current_subj = "Unknown"
         self.current_act = "Unknown"
         
@@ -27,93 +24,84 @@ class DataPrepPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # LEFT PANEL: Clean Graph & Log
         left_panel = QSplitter(Qt.Orientation.Vertical)
         
-        # Clean Graph Area (No UI clutter)
         self.graph_container = QFrame()
         self.graph_container.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
         self.graph_layout = QVBoxLayout(self.graph_container)
         self.graph_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.plot_widget = None # Initialized lazily
+        self.plot_widget = None
         self.raw_curve = None
         self.clean_curve = None
 
         left_panel.addWidget(self.graph_container)
 
-        # Log Area
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
-        self.txt_log.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: #0d0d0f; color: {TEXT_DIM}; 
-                border: none; border-top: 1px solid {BORDER}; border-right: 1px solid {BORDER};
-                font-family: Consolas; font-size: 11px; padding: 10px;
-            }}""")
+        self.txt_log.setStyleSheet(f"background-color: #0d0d0f; color: {TEXT_DIM}; border: none; border-top: 1px solid {BORDER}; border-right: 1px solid {BORDER}; font-family: Consolas; font-size: 11px; padding: 10px;")
         
         left_panel.addWidget(self.txt_log)
-        left_panel.setSizes([600, 200]) # 75% Graph, 25% Log
+        left_panel.setSizes([600, 200])
         layout.addWidget(left_panel, stretch=1)
 
-        # RIGHT PANEL: Compact Control Panel
         ctrl_panel = QFrame()
         ctrl_panel.setFixedWidth(PANEL_WIDTH + 40)
-        ctrl_panel.setStyleSheet(f"background-color: {BG_PANEL}; border-left: 1px solid {BORDER};")
+        ctrl_panel.setStyleSheet(CSS_SIDEBAR)
         ctrl_lay = QVBoxLayout(ctrl_panel)
         ctrl_lay.setContentsMargins(20, 20, 20, 20)
         ctrl_lay.setSpacing(15)
         ctrl_lay.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        lbl_h = f"color: {TEXT_MAIN}; font-weight: bold; font-size: 11px; border: none; margin-bottom: 2px;"
-        
-        # --- 1. DATA SOURCE ---
-        ctrl_lay.addWidget(QLabel("1. DATA SOURCE", styleSheet=lbl_h))
+        ctrl_lay.addWidget(QLabel("1. DATA SOURCE", styleSheet=CSS_HEADER))
         self.btn_load = QPushButton("Select File")
         self.btn_load.clicked.connect(self.load_file)
         self.btn_load.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load.setStyleSheet(f"QPushButton {{ background-color: {ACCENT_COLOR}; color: white; padding: 10px; border-radius: 4px; }}")
+        self.btn_load.setStyleSheet(CSS_BTN_PRIMARY)
         ctrl_lay.addWidget(self.btn_load)
         
         self.lbl_file = QLabel("No file selected")
         self.lbl_file.setStyleSheet(f"color: {ACCENT_COLOR}; font-size: 10px; font-style: italic; border: none;")
         ctrl_lay.addWidget(self.lbl_file)
         
-        line = QFrame(); line.setFixedHeight(1); line.setStyleSheet(f"background-color: {BORDER};")
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background-color: {BORDER};")
         ctrl_lay.addWidget(line)
 
-        # --- 2. PLOT CONTROLS ---
-        ctrl_lay.addWidget(QLabel("2. PLOT PREVIEW", styleSheet=lbl_h))
+        ctrl_lay.addWidget(QLabel("2. PLOT PREVIEW", styleSheet=CSS_HEADER))
         self.cmb_joint = QComboBox()
-        self.cmb_joint.setStyleSheet(f"background-color: #18181b; color: white; border: 1px solid {BORDER}; padding: 4px;")
+        self.cmb_joint.setStyleSheet(CSS_INPUT)
         self.cmb_joint.currentIndexChanged.connect(self.update_graph)
         ctrl_lay.addWidget(self.cmb_joint)
         
-        # Custom Legend in panel
         legend_lay = QHBoxLayout()
         legend_lay.setContentsMargins(0, 0, 0, 0)
         
         def add_legend_item(text, color, dotted=False):
             box = QLabel()
             box.setFixedSize(14, 4)
-            if dotted: box.setStyleSheet(f"border-top: 2px dotted {color}; background: transparent;")
-            else: box.setStyleSheet(f"background-color: {color};")
+            if dotted: 
+                box.setStyleSheet(f"border-top: 2px dotted {color}; background: transparent;")
+            else: 
+                box.setStyleSheet(f"background-color: {color};")
             lbl = QLabel(text)
             lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
-            legend_lay.addWidget(box); legend_lay.addWidget(lbl)
+            legend_lay.addWidget(box)
+            legend_lay.addWidget(lbl)
 
         add_legend_item("Raw", "#ff5555", dotted=True)
         legend_lay.addStretch()
         add_legend_item("Clean", "#55ff55")
         ctrl_lay.addLayout(legend_lay)
 
-        line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background-color: {BORDER};")
+        line2 = QFrame()
+        line2.setFixedHeight(1)
+        line2.setStyleSheet(f"background-color: {BORDER};")
         ctrl_lay.addWidget(line2)
 
-        # --- 3. PIPELINE SETTINGS ---
-        ctrl_lay.addWidget(QLabel("3. CLEANING PIPELINE", styleSheet=lbl_h))
+        ctrl_lay.addWidget(QLabel("3. CLEANING PIPELINE", styleSheet=CSS_HEADER))
         
-        # Teleportation
         self.chk_teleport = QCheckBox("Remove Joint Teleportation")
         self.chk_teleport.setChecked(True)
         self.chk_teleport.setStyleSheet(f"color: {TEXT_DIM}; border: none;")
@@ -122,18 +110,18 @@ class DataPrepPage(QWidget):
         tele_lay = QHBoxLayout()
         tele_lay.addWidget(QLabel("Distance Threshold:", styleSheet=f"color: {TEXT_DIM}; border: none;"))
         self.spn_tele_thresh = QDoubleSpinBox()
-        self.spn_tele_thresh.setRange(0.01, 10.0); self.spn_tele_thresh.setValue(0.5); self.spn_tele_thresh.setSingleStep(0.1)
-        self.spn_tele_thresh.setStyleSheet(f"background-color: #18181b; color: white; border: 1px solid {BORDER}; padding: 2px;")
+        self.spn_tele_thresh.setRange(0.01, 10.0)
+        self.spn_tele_thresh.setValue(0.5)
+        self.spn_tele_thresh.setSingleStep(0.1)
+        self.spn_tele_thresh.setStyleSheet(CSS_INPUT)
         tele_lay.addWidget(self.spn_tele_thresh)
         ctrl_lay.addLayout(tele_lay)
 
-        # Repair
         self.chk_repair = QCheckBox("Interpolate Missing/Dropped Data")
         self.chk_repair.setChecked(True)
         self.chk_repair.setStyleSheet(f"color: {TEXT_DIM}; border: none; margin-top: 5px;")
         ctrl_lay.addWidget(self.chk_repair)
 
-        # Smoothing
         self.chk_smooth = QCheckBox("Apply Moving Average")
         self.chk_smooth.setChecked(True)
         self.chk_smooth.setStyleSheet(f"color: {TEXT_DIM}; border: none; margin-top: 5px;")
@@ -142,22 +130,23 @@ class DataPrepPage(QWidget):
         smooth_lay = QHBoxLayout()
         smooth_lay.addWidget(QLabel("Window Size:", styleSheet=f"color: {TEXT_DIM}; border: none;"))
         self.spn_win = QSpinBox()
-        self.spn_win.setRange(3, 101); self.spn_win.setValue(5); self.spn_win.setSingleStep(2)
-        self.spn_win.setStyleSheet(f"background-color: #18181b; color: white; border: 1px solid {BORDER}; padding: 2px;")
+        self.spn_win.setRange(3, 101)
+        self.spn_win.setValue(5)
+        self.spn_win.setSingleStep(2)
+        self.spn_win.setStyleSheet(CSS_INPUT)
         smooth_lay.addWidget(self.spn_win)
         ctrl_lay.addLayout(smooth_lay)
 
-        # --- ACTIONS ---
         ctrl_lay.addSpacing(15)
         self.btn_preview = QPushButton("RUN PREVIEW")
         self.btn_preview.clicked.connect(self.run_preview)
-        self.btn_preview.setStyleSheet(f"QPushButton {{ background-color: #3f3f46; color: white; font-weight: bold; padding: 10px; border-radius: 4px; }}")
+        self.btn_preview.setStyleSheet(CSS_BTN_OUTLINE)
         self.btn_preview.setEnabled(False)
         ctrl_lay.addWidget(self.btn_preview)
 
         self.btn_process = QPushButton("COMMIT TO VISUALIZER")
         self.btn_process.clicked.connect(self.commit_to_viz)
-        self.btn_process.setStyleSheet(f"QPushButton {{ background-color: {ACCENT_COLOR}; color: {BG_DARK}; font-weight: bold; padding: 12px; border-radius: 4px; }}")
+        self.btn_process.setStyleSheet(CSS_BTN_PRIMARY)
         self.btn_process.setEnabled(False)
         ctrl_lay.addWidget(self.btn_process)
         
@@ -165,13 +154,14 @@ class DataPrepPage(QWidget):
         
         self.btn_export = QPushButton("EXPORT CSV")
         self.btn_export.clicked.connect(self.export_file)
-        self.btn_export.setStyleSheet(f"QPushButton {{ background-color: transparent; color: {TEXT_DIM}; border: 1px solid {BORDER}; padding: 10px; }}")
+        self.btn_export.setStyleSheet(CSS_BTN_OUTLINE)
         self.btn_export.setEnabled(False)
         ctrl_lay.addWidget(self.btn_export)
         
         layout.addWidget(ctrl_panel)
 
-    def log(self, text): self.txt_log.append(str(text))
+    def log(self, text): 
+        self.txt_log.append(str(text))
 
     def init_graph(self):
         if self.plot_widget is None:
@@ -179,7 +169,6 @@ class DataPrepPage(QWidget):
             self.plot_widget = pg.PlotWidget()
             self.plot_widget.setBackground(None)
             self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-            # No pg Legend, managed by UI Panel
             
             self.raw_curve = self.plot_widget.plot(pen=pg.mkPen('#ff5555', width=1.5, style=Qt.PenStyle.DotLine))
             self.clean_curve = self.plot_widget.plot(pen=pg.mkPen('#55ff55', width=2))
@@ -201,18 +190,18 @@ class DataPrepPage(QWidget):
                 self.current_act = act
                 self.log(f">> Metadata Found: Subject {subj}, Activity {act}")
 
-                # Populate Joint Dropdown
                 self.cmb_joint.blockSignals(True)
                 self.cmb_joint.clear()
                 joint_cols = [col for col in self.raw_df.columns if col.startswith('j')]
                 self.cmb_joint.addItems(joint_cols)
                 self.cmb_joint.blockSignals(False)
 
-                # Optional Data Validation Output
                 from core.studio import processing
                 report, needs_repair = processing.PipelineProcessor.validate(self.raw_df)
                 self.log(report)
-                if needs_repair: self.log(">> Auto-repair highly recommended.")
+                
+                if needs_repair: 
+                    self.log(">> Auto-repair highly recommended.")
                 
                 self.lbl_file.setText(os.path.basename(fn))
                 self.btn_preview.setEnabled(True)
@@ -223,29 +212,27 @@ class DataPrepPage(QWidget):
                 self.log(f"Error: {e}")
 
     def run_preview(self):
-        """Builds clean_df through PipelineProcessor steps."""
-        if self.raw_df is None: return
+        if self.raw_df is None: 
+            return
         
         from core.studio import processing
         df = self.raw_df.copy()
         self.log("\n> Generating Pipeline Preview...")
         
-        # 1. Check Teleportation
         if self.chk_teleport.isChecked():
             thresh = self.spn_tele_thresh.value()
             df, count = processing.PipelineProcessor.remove_teleportation(df, threshold=thresh)
             if count > 0:
                 self.log(f"• Removed {count} teleported joint instances (> {thresh})")
         
-        # 2. Repair (Stable NaN Handling)
         if self.chk_repair.isChecked(): 
             df = processing.PipelineProcessor.repair(df)
             self.log("• Applied stable Gap & NaN Interpolation")
             
-        # 3. Moving Average
         if self.chk_smooth.isChecked():
             w = self.spn_win.value()
-            if w % 2 == 0: w += 1
+            if w % 2 == 0: 
+                w += 1
             df = processing.PipelineProcessor.smooth(df, window=w)
             self.log(f"• Applied Moving Average (w={w})")
             
@@ -254,7 +241,8 @@ class DataPrepPage(QWidget):
         self.update_graph()
 
     def update_graph(self):
-        if self.raw_df is None or self.clean_df is None or self.plot_widget is None: return
+        if self.raw_df is None or self.clean_df is None or self.plot_widget is None: 
+            return
         
         joint = self.cmb_joint.currentText()
         if joint and joint in self.raw_df.columns:
@@ -268,70 +256,12 @@ class DataPrepPage(QWidget):
         self.parent_app.switch_to_viz()
 
     def export_file(self):
-        if self.clean_df is None: return
-        from core.common import io
+        if self.clean_df is None: 
+            return
         fn, _ = QFileDialog.getSaveFileName(self, "Save", "clean.csv", "CSV (*.csv)")
         if fn:
             success, msg = io.export_clean_csv(self.clean_df, fn)
             self.log(f"> {msg}")
-
-# =============================================================================
-#   CUSTOM UI WIDGETS & VISUALIZER (UNCHANGED)
-# =============================================================================
-class MetricGraph(QWidget):
-    def __init__(self, title, color, min_v=0, max_v=180):
-        super().__init__()
-        import pyqtgraph as pg 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 15) 
-        layout.setSpacing(4)
-        header = QHBoxLayout()
-        t_lbl = QLabel(title.upper())
-        t_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 9px; font-weight: bold; border: none;")
-        self.v_lbl = QLabel("--")
-        self.v_lbl.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: bold; border: none;")
-        header.addWidget(t_lbl); header.addStretch(); header.addWidget(self.v_lbl)
-        layout.addLayout(header)
-        
-        self.box = QFrame()
-        self.box.setFixedHeight(80) 
-        self.box.setStyleSheet(f"background-color: {BG_DARK}; border: 1px solid {BORDER}; border-radius: 4px;")
-        box_lay = QVBoxLayout(self.box)
-        box_lay.setContentsMargins(0, 0, 0, 0)
-        
-        self.plot = pg.PlotWidget()
-        self.plot.setBackground(None)
-        self.plot.hideAxis('bottom'); self.plot.hideAxis('left')
-        self.plot.showGrid(x=True, y=True, alpha=0.2)
-        self.plot.setMouseEnabled(x=False, y=False)
-        self.plot.setYRange(min_v, max_v, padding=0.1)
-        
-        self.curve = self.plot.plot(pen=pg.mkPen(color, width=2))
-        box_lay.addWidget(self.plot)
-        layout.addWidget(self.box)
-
-    def update_data(self, data_list):
-        if not data_list: return
-        self.curve.setData(data_list)
-        self.v_lbl.setText(f"{int(data_list[-1])}°")
-
-class SkeletonLegend(QFrame):
-    def __init__(self):
-        super().__init__()
-        self.setStyleSheet(f"border: none; background: transparent;")
-        l = QHBoxLayout(self)
-        l.setContentsMargins(0, 5, 0, 15)
-        def add_item(name, color):
-            box = QLabel()
-            box.setFixedSize(10, 10)
-            box.setStyleSheet(f"background-color: {color}; border-radius: 2px; border: none;")
-            txt = QLabel(name)
-            txt.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
-            l.addWidget(box); l.addWidget(txt); l.addSpacing(10)
-        add_item("Left", COLOR_BONE_LEFT)
-        add_item("Right", COLOR_BONE_RIGHT)
-        add_item("Center", COLOR_BONE_CENTER)
-        l.addStretch()
 
 
 class VisualizerPage(QWidget):
@@ -340,8 +270,10 @@ class VisualizerPage(QWidget):
         self.active_session = None
         self.frame_idx = 0
         self.playing = False
-        self.keys = ['lean_x', 'lean_z', 'l_knee', 'r_knee', 'l_hip', 'r_hip', 'l_sho', 'r_sho', 'l_elb', 'r_elb']
+        
+        self.keys = [cfg[0] for cfg in METRIC_CONFIGS]
         self.history = {k: [] for k in self.keys}
+        self.graphs = {}
         
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -358,10 +290,10 @@ class VisualizerPage(QWidget):
         self.is_initialized = False
 
     def init_graphics(self):
-        if self.is_initialized: return
-        import pyqtgraph as pg
+        if self.is_initialized: 
+            return
+            
         from core.studio.visuals import SkeletonDisplay
-        from core.studio import metrics
         
         self.loading_lbl.setParent(None)
         self.viz = SkeletonDisplay()
@@ -369,13 +301,14 @@ class VisualizerPage(QWidget):
         
         dash_container = QWidget()
         dash_container.setFixedWidth(PANEL_WIDTH)
-        dash_container.setStyleSheet(f"background-color: {BG_PANEL}; border: none; border-left: 1px solid {BORDER};")
+        dash_container.setStyleSheet(CSS_SIDEBAR)
         dash_layout = QVBoxLayout(dash_container)
         dash_layout.setContentsMargins(0, 0, 0, 0)
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; } QScrollBar { width: 8px; background: #222; }")
+        
         scroll_content = QWidget()
         scroll_content.setStyleSheet(f"background-color: {BG_PANEL}; border: none;")
         self.grid = QGridLayout(scroll_content)
@@ -384,18 +317,22 @@ class VisualizerPage(QWidget):
         
         self.info_box_widget = QWidget()
         info_lay = QVBoxLayout(self.info_box_widget)
-        info_lay.setContentsMargins(0,0,0,10)
-        info_lay.addWidget(QLabel("SESSION INFO", styleSheet=f"color: {ACCENT_COLOR}; font-size: 11px; font-weight: bold; margin-bottom: 5px; border: none;"))
+        info_lay.setContentsMargins(0, 0, 0, 10)
+        info_lay.addWidget(QLabel("SESSION INFO", styleSheet=CSS_HEADER))
         self.info_vals = {}
+        
         def add_info(lbl, key):
             row = QHBoxLayout()
             l = QLabel(lbl)
             l.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px; border: none; background: transparent;")
             v = QLabel("--")
             v.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 11px; font-weight: bold; border: none; background: transparent;")
-            row.addWidget(l); row.addStretch(); row.addWidget(v)
+            row.addWidget(l)
+            row.addStretch()
+            row.addWidget(v)
             info_lay.addLayout(row)
             self.info_vals[key] = v
+            
         add_info("Subject", "lbl_subj")
         add_info("Activity", "lbl_act")
         add_info("FPS", "lbl_fps")
@@ -404,21 +341,15 @@ class VisualizerPage(QWidget):
         self.grid.addWidget(self.info_box_widget, 0, 0, 1, 2)
         self.grid.addWidget(SkeletonLegend(), 1, 0, 1, 2)
         
-        self.g_lean_x = MetricGraph("Trunk Lat.", GRAPH_CENTER, -45, 45)
-        self.g_lean_z = MetricGraph("Trunk Depth", GRAPH_Z_AXIS, -45, 45)
-        self.grid.addWidget(self.g_lean_x, 2, 0); self.grid.addWidget(self.g_lean_z, 2, 1)
-        self.g_lknee = MetricGraph("L.Knee Flex", GRAPH_LEFT, 0, 180)
-        self.g_rknee = MetricGraph("R.Knee Flex", GRAPH_RIGHT, 0, 180)
-        self.grid.addWidget(self.g_lknee, 3, 0); self.grid.addWidget(self.g_rknee, 3, 1)
-        self.g_lhip = MetricGraph("L.Hip Flex", GRAPH_LEFT, 0, 180)
-        self.g_rhip = MetricGraph("R.Hip Flex", GRAPH_RIGHT, 0, 180)
-        self.grid.addWidget(self.g_lhip, 4, 0); self.grid.addWidget(self.g_rhip, 4, 1)
-        self.g_lsho = MetricGraph("L.Shoulder Flex", GRAPH_LEFT, 0, 180)
-        self.g_rsho = MetricGraph("R.Shoulder Flex", GRAPH_RIGHT, 0, 180)
-        self.grid.addWidget(self.g_lsho, 5, 0); self.grid.addWidget(self.g_rsho, 5, 1)
-        self.g_lelb = MetricGraph("L.Elbow Flex", GRAPH_LEFT, 0, 180)
-        self.g_relb = MetricGraph("R.Elbow Flex", GRAPH_RIGHT, 0, 180)
-        self.grid.addWidget(self.g_lelb, 6, 0); self.grid.addWidget(self.g_relb, 6, 1)
+        row_idx = 2
+        for i in range(0, len(METRIC_CONFIGS), 2):
+            for col_idx in range(2):
+                if i + col_idx < len(METRIC_CONFIGS):
+                    key, title, color, min_v, max_v = METRIC_CONFIGS[i + col_idx]
+                    graph = MetricGraph(title, color, min_v, max_v)
+                    self.graphs[key] = graph
+                    self.grid.addWidget(graph, row_idx, col_idx)
+            row_idx += 1
         
         scroll.setWidget(scroll_content)
         dash_layout.addWidget(scroll)
@@ -427,34 +358,35 @@ class VisualizerPage(QWidget):
         footer.setStyleSheet(f"background-color: {BG_PANEL}; border-top: 1px solid {BORDER}; border-left: none; border-right: none; border-bottom: none;")
         f_lay = QVBoxLayout(footer)
         f_lay.setContentsMargins(10, 10, 10, 10)
+        
         self.lbl_time = QLabel("00:00")
         self.lbl_time.setStyleSheet(f"color: {TEXT_MAIN}; font-family: Consolas; font-size: 14px; font-weight: bold; border: none;")
         self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
         f_lay.addWidget(self.lbl_time)
+        
         instr = QLabel("[SPACE] Play/Pause")
         instr.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
         instr.setAlignment(Qt.AlignmentFlag.AlignCenter)
         f_lay.addWidget(instr)
+        
         self.btn_load_ext = QPushButton("LOAD RECORDING")
         self.btn_load_ext.clicked.connect(self.load_external)
         self.btn_load_ext.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load_ext.setStyleSheet(f"QPushButton {{ background-color: {ACCENT_COLOR}; color: {BG_DARK}; border: none; border-radius: 4px; padding: 12px; font-weight: bold; font-size: 11px; }} QPushButton:hover {{ background-color: {ACCENT_HOVER}; }}")
+        self.btn_load_ext.setStyleSheet(CSS_BTN_PRIMARY)
         f_lay.addWidget(self.btn_load_ext)
+        
         dash_layout.addWidget(footer)
         self.layout.addWidget(dash_container)
         self.is_initialized = True
 
     def load_session(self, session, filename="", subj="Unknown", act="Unknown"):
-        if not self.is_initialized: return
+        if not self.is_initialized: 
+            return
+        
         from core.studio import metrics 
         self.active_session = session
         self.frame_idx = 0
         self.history = {k: [] for k in self.keys}
-        
-        if subj == "Unknown" and filename:
-            clean_name = os.path.basename(filename).replace('.csv', '').replace('.parquet', '')
-            parts = clean_name.split('_')
-            if len(parts) >= 2: subj, act = parts[0], parts[1]
         
         self.info_vals['lbl_subj'].setText(subj)
         self.info_vals['lbl_act'].setText(act)
@@ -470,73 +402,87 @@ class VisualizerPage(QWidget):
         if session.frames:
             first_frame = session.frames[0]
             hip = metrics.get_point(first_frame, "hip_mid")
-            if hip: self.viz.center_view(hip[0], -hip[1]) 
+            if hip: 
+                self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
 
     def load_external(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Open Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             try:
-                from core.common import io 
                 df, subj, act = io.load_session_data(fn)
                 session = data.df_to_session(df)
                 self.load_session(session, fn, subj, act)
-            except Exception as e: QMessageBox.critical(self, "Error", str(e))
+            except Exception as e: 
+                QMessageBox.critical(self, "Error", str(e))
 
     def toggle_play(self):
-        if not self.is_initialized: return
+        if not self.is_initialized: 
+            return
         self.playing = not self.playing
-        if self.playing: self.timer.start()
-        else: self.timer.stop()
+        if self.playing: 
+            self.timer.start()
+        else: 
+            self.timer.stop()
         
     def step(self, delta):
-        if not self.is_initialized: return
+        if not self.is_initialized: 
+            return
         self.playing = False
         self.timer.stop()
-        if not self.active_session: return
+        if not self.active_session: 
+            return
         self.frame_idx = (self.frame_idx + delta) % len(self.active_session.frames)
         self.loop(update_idx=False)
 
     def loop(self, update_idx=True):
-        if not self.active_session or not self.active_session.frames: return
+        if not self.active_session or not self.active_session.frames: 
+            return
+            
         from core.studio import metrics 
         f = self.active_session.frames[self.frame_idx]
         self.viz.update_frame(f)
         vals = metrics.compute_all_metrics(f)
 
-        self._update_graph(self.g_lean_x, 'lean_x', vals['lean_x'])
-        self._update_graph(self.g_lean_z, 'lean_z', vals['lean_z'])
-        self._update_graph(self.g_lknee, 'l_knee', vals['l_knee'])
-        self._update_graph(self.g_rknee, 'r_knee', vals['r_knee'])
-        self._update_graph(self.g_lhip, 'l_hip', vals['l_hip'])
-        self._update_graph(self.g_rhip, 'r_hip', vals['r_hip'])
-        self._update_graph(self.g_lsho, 'l_sho', vals['l_sho'])
-        self._update_graph(self.g_rsho, 'r_sho', vals['r_sho'])
-        self._update_graph(self.g_lelb, 'l_elb', vals['l_elb'])
-        self._update_graph(self.g_relb, 'r_elb', vals['r_elb'])
+        for key in self.keys:
+            if key in vals and key in self.graphs:
+                self.history[key].append(vals[key])
+                if len(self.history[key]) > MAX_HISTORY_LENGTH: 
+                    self.history[key].pop(0)
+                self.graphs[key].update_data(self.history[key])
         
         self.lbl_time.setText(f"{f.timestamp:.1f}s")
-        if update_idx: self.frame_idx = (self.frame_idx + 1) % len(self.active_session.frames)
+        if update_idx: 
+            self.frame_idx = (self.frame_idx + 1) % len(self.active_session.frames)
 
-    def _update_graph(self, graph, key, val):
-        self.history[key].append(val)
-        if len(self.history[key]) > MAX_HISTORY_LENGTH: self.history[key].pop(0)
-        graph.update_data(self.history[key])
 
 class UnifiedWorkstation(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OST Studio")
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
-        self.setStyleSheet(f"QMainWindow {{ background-color: {BG_DARK}; }}")
-        if os.path.exists(ICON): self.setWindowIcon(QIcon(ICON))
+        self.setStyleSheet(CSS_MAIN_WINDOW)
         
-        central = QWidget(); self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central); main_layout.setContentsMargins(0, 0, 0, 0); main_layout.setSpacing(0)
+        if os.path.exists(ICON): 
+            self.setWindowIcon(QIcon(ICON))
         
-        nav_bar = QFrame(); nav_bar.setFixedHeight(50); nav_bar.setStyleSheet(f"background-color: {BG_DARK}; border-bottom: 1px solid {BORDER}; padding-bottom: 2px;")
-        nav_lay = QHBoxLayout(nav_bar); nav_lay.setContentsMargins(20, 0, 20, 0); nav_lay.setSpacing(20)
-        title = QLabel("OST STUDIO"); title.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: 900; font-size: 16px; margin-right: 20px; border: none;")
+        central = QWidget()
+        self.setCentralWidget(central)
+        
+        main_layout = QVBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        nav_bar = QFrame()
+        nav_bar.setFixedHeight(50)
+        nav_bar.setStyleSheet(f"background-color: {BG_DARK}; border-bottom: 1px solid {BORDER}; padding-bottom: 2px;")
+        
+        nav_lay = QHBoxLayout(nav_bar)
+        nav_lay.setContentsMargins(20, 0, 20, 0)
+        nav_lay.setSpacing(20)
+        
+        title = QLabel("OST STUDIO")
+        title.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: 900; font-size: 16px; margin-right: 20px; border: none;")
         nav_lay.addWidget(title)
         
         self.btn_prep = self._nav_btn("DATA STUDIO")
@@ -544,27 +490,43 @@ class UnifiedWorkstation(QMainWindow):
         self.btn_prep.clicked.connect(lambda: self.switch_page(0))
         self.btn_viz.clicked.connect(lambda: self.switch_page(1))
         
-        nav_lay.addWidget(self.btn_prep); nav_lay.addWidget(self.btn_viz); nav_lay.addStretch()
-        l_ver = QLabel(VERSION); l_ver.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none; margin-top: 15px;"); l_ver.setAlignment(Qt.AlignmentFlag.AlignRight)
-        nav_lay.addWidget(l_ver); main_layout.addWidget(nav_bar)
+        nav_lay.addWidget(self.btn_prep)
+        nav_lay.addWidget(self.btn_viz)
+        nav_lay.addStretch()
+        
+        l_ver = QLabel(VERSION)
+        l_ver.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none; margin-top: 15px;")
+        l_ver.setAlignment(Qt.AlignmentFlag.AlignRight)
+        nav_lay.addWidget(l_ver)
+        main_layout.addWidget(nav_bar)
         
         self.stack = QStackedWidget()
-        self.page_prep = DataPrepPage(self); self.page_viz = VisualizerPage() 
-        self.stack.addWidget(self.page_prep); self.stack.addWidget(self.page_viz)
+        self.page_prep = DataPrepPage(self)
+        self.page_viz = VisualizerPage() 
+        
+        self.stack.addWidget(self.page_prep)
+        self.stack.addWidget(self.page_viz)
         main_layout.addWidget(self.stack)
         
         self.switch_page(0)
         QTimer.singleShot(100, self.boot_heavy_systems)
 
     def boot_heavy_systems(self):
-        try: self.page_viz.init_graphics()
+        try: 
+            self.page_viz.init_graphics()
         except Exception as e:
-            if pyi_splash: pyi_splash.close()
+            close_splash()
             traceback.print_exc()
 
     def _nav_btn(self, text):
-        btn = QPushButton(text); btn.setCheckable(True); btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet(f"QPushButton {{ color: {TEXT_DIM}; font-weight: bold; border: none; font-size: 12px; padding: 0 10px; height: 48px; }} QPushButton:hover {{ color: {TEXT_MAIN}; }} QPushButton:checked {{ color: {ACCENT_COLOR}; border-bottom: 2px solid {ACCENT_COLOR}; }}")
+        btn = QPushButton(text)
+        btn.setCheckable(True)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet(f"""
+            QPushButton {{ color: {TEXT_DIM}; font-weight: bold; border: none; font-size: 12px; padding: 0 10px; height: 48px; }} 
+            QPushButton:hover {{ color: {TEXT_MAIN}; }} 
+            QPushButton:checked {{ color: {ACCENT_COLOR}; border-bottom: 2px solid {ACCENT_COLOR}; }}
+        """)
         return btn
 
     def switch_page(self, index):
@@ -572,7 +534,9 @@ class UnifiedWorkstation(QMainWindow):
         self.btn_prep.setChecked(index == 0)
         self.btn_viz.setChecked(index == 1)
 
-    def switch_to_viz(self): self.switch_page(1)
+    def switch_to_viz(self): 
+        self.switch_page(1)
+        
     def load_data_into_viz(self, df, subj="Unknown", act="Unknown"):
         from core.common import data
         session = data.df_to_session(df)
@@ -580,17 +544,21 @@ class UnifiedWorkstation(QMainWindow):
 
     def keyPressEvent(self, event):
         if self.stack.currentIndex() == 1: 
-            if event.key() == Qt.Key.Key_Space: self.page_viz.toggle_play()
-            elif event.key() == Qt.Key.Key_R: self.page_viz.frame_idx = 0; self.page_viz.loop(update_idx=False)
-            elif event.key() == Qt.Key.Key_Left: self.page_viz.step(-1)
-            elif event.key() == Qt.Key.Key_Right: self.page_viz.step(1)
+            if event.key() == Qt.Key.Key_Space: 
+                self.page_viz.toggle_play()
+            elif event.key() == Qt.Key.Key_R: 
+                self.page_viz.frame_idx = 0
+                self.page_viz.loop(update_idx=False)
+            elif event.key() == Qt.Key.Key_Left: 
+                self.page_viz.step(-1)
+            elif event.key() == Qt.Key.Key_Right: 
+                self.page_viz.step(1)
         super().keyPressEvent(event)
 
+
 if __name__ == "__main__":
-    try: import pyi_splash # type: ignore
-    except ImportError: pyi_splash = None
     app = QApplication(sys.argv)
+    close_splash()
     w = UnifiedWorkstation()
-    if pyi_splash and pyi_splash.is_alive(): pyi_splash.close()
     w.show()
     sys.exit(app.exec())

@@ -1,3 +1,6 @@
+import sys
+import os
+
 # --- APP DIMENSIONS ---
 WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 650
@@ -6,79 +9,82 @@ MIN_WINDOW_HEIGHT = 550
 PANEL_WIDTH = 320
 
 # --- UI PALETTE ---
-ACCENT_COLOR = "#0FA6C1"      # Cyan Accent (Used for Highlights & Buttons)
-ACCENT_HOVER = "#167B87"      # Darker Cyan (Hover State)
-BG_DARK = "#18181b"           # Zinc 950 (Main Window)
-BG_PANEL = "#27272a"          # Zinc 800 (Side Panel)
-TEXT_MAIN = "#e4e4e7"         # Zinc 200
-TEXT_DIM = "#a1a1aa"          # Zinc 400
-BORDER = "#3f3f46"            # Zinc 700
+ACCENT_COLOR = "#0FA6C1"
+ACCENT_HOVER = "#167B87"
+BG_DARK = "#18181b"
+BG_PANEL = "#27272a"
+TEXT_MAIN = "#e4e4e7"
+TEXT_DIM = "#a1a1aa"
+BORDER = "#3f3f46"
 
-# --- SKELETON PALETTE (Unique/Lateral) ---
+# --- SKELETON & GRAPH PALETTE ---
 COLOR_BONE_LEFT = "#9e2a2b"
 COLOR_BONE_RIGHT = "#2e86c1"
 COLOR_BONE_CENTER = "#7fb069"
 COLOR_JOINT = "#f4e9d8"
 
-# --- GRAPH PALETTE ---
-GRAPH_LEFT = "#9e2a2b"        # Matches Bone Left
-GRAPH_RIGHT = "#2e86c1"       # Matches Bone Right
-GRAPH_CENTER = "#fbbf24"      # Amber
-GRAPH_Z_AXIS = "#7fb069"    # Emerald
+GRAPH_LEFT = "#9e2a2b"
+GRAPH_RIGHT = "#2e86c1"
+GRAPH_CENTER = "#fbbf24"
+GRAPH_Z_AXIS = "#7fb069"
 
-# Version
+# --- APP STRINGS ---
+APP_NAME = "OST Suite"
 VERSION = "v0.2.0"
-
-# Recording Settings
-STYLESHEET = """
-QMainWindow { background-color: #2b2b2b; }
-QFrame#Sidebar { background-color: #212121; border-right: 1px solid #3a3a3a; }
-QLabel { color: #e0e0e0; font-family: 'Segoe UI', Arial; }
-QLineEdit { 
-    background-color: #3a3a3a; color: white; border: 1px solid #555; 
-    border-radius: 4px; padding: 4px; font-size: 12px;
-}
-QComboBox { 
-    background-color: #3a3a3a; color: white; border: 1px solid #555; 
-    border-radius: 4px; padding: 4px;
-}
-QComboBox::drop-down { border: none; }
-QPushButton#RecBtn { 
-    background-color: #28a745; color: white; border-radius: 5px; 
-    font-weight: bold; font-size: 14px;
-}
-QPushButton#RecBtn:hover { background-color: #218838; }
-QPushButton#RecBtn:pressed { background-color: #1e7e34; }
-QPushButton#RecBtn[recording="true"] { background-color: #dc3545; }
-QPushButton#RecBtn[recording="true"]:hover { background-color: #c82333; }
-"""
-
-# History of Line Graphs
 MAX_HISTORY_LENGTH = 40
 
-import sys
-import os
+# --- UNIVERSAL CSS THEMES ---
+CSS_MAIN_WINDOW = f"QMainWindow {{ background-color: {BG_DARK}; }}"
+CSS_SIDEBAR = f"background-color: {BG_PANEL}; border-left: 1px solid {BORDER}; border-right: 1px solid {BORDER};"
+CSS_HEADER = f"color: {TEXT_MAIN}; font-weight: bold; font-size: 11px; border: none; margin-bottom: 2px;"
+CSS_INPUT = f"background-color: #18181b; color: white; border: 1px solid {BORDER}; padding: 6px; border-radius: 4px;"
 
+CSS_BTN_PRIMARY = f"""
+    QPushButton {{ background-color: {ACCENT_COLOR}; color: {BG_DARK}; font-weight: bold; padding: 10px; border: none; border-radius: 4px; }}
+    QPushButton:hover {{ background-color: {ACCENT_HOVER}; }}
+    QPushButton:disabled {{ background-color: #3f3f46; color: #71717a; }}
+"""
+CSS_BTN_OUTLINE = f"""
+    QPushButton {{ background-color: transparent; color: {TEXT_DIM}; font-weight: bold; border: 1px solid {BORDER}; padding: 10px; border-radius: 4px; }}
+    QPushButton:hover {{ border-color: {ACCENT_COLOR}; color: {ACCENT_COLOR}; }}
+    QPushButton:disabled {{ border-color: #333; color: #555; }}
+"""
+
+
+# --- METRIC GRAPH CONFIGURATIONS ---
+# Format: (Dictionary Key, UI Title, Color, Min Range, Max Range)
+METRIC_CONFIGS = [
+    ('lean_x', "Trunk Lat.", GRAPH_CENTER, -45, 45),
+    ('lean_z', "Trunk Depth", GRAPH_Z_AXIS, -45, 45),
+    ('l_knee', "L.Knee Flex", GRAPH_LEFT, 0, 180),
+    ('r_knee', "R.Knee Flex", GRAPH_RIGHT, 0, 180),
+    ('l_hip',  "L.Hip Flex", GRAPH_LEFT, 0, 180),
+    ('r_hip',  "R.Hip Flex", GRAPH_RIGHT, 0, 180),
+    ('l_sho',  "L.Shoulder Flex", GRAPH_LEFT, 0, 180),
+    ('r_sho',  "R.Shoulder Flex", GRAPH_RIGHT, 0, 180),
+    ('l_elb',  "L.Elbow Flex", GRAPH_LEFT, 0, 180),
+    ('r_elb',  "R.Elbow Flex", GRAPH_RIGHT, 0, 180)
+]
+
+# --- PATH RESOLUTION ---
 def get_base_path():
-    """Returns the base directory whether frozen or script."""
     if getattr(sys, 'frozen', False):
-        # In frozen mode, assets are usually in the internal temporary folder
         return sys._MEIPASS
-    else:
-        # In dev mode, return the project root
-        # This file is in ost/core/, so we go up two levels
-        return os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 BASE_DIR = get_base_path()
-
-# Define Paths
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+
 ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
 COMMAND_ICON = os.path.join(ASSETS_DIR, "command.ico")
 LOGO = os.path.join(ASSETS_DIR, "logo-main-whiteText.png")
 
-
-
-# Configs
-APP_NAME = "OST Suite"
-VERSION = "V0.1.0"
+# --- BOILERPLATE UTILS ---
+def close_splash():
+    """Safely closes the PyInstaller splash screen if it exists."""
+    try:
+        import pyi_splash # type: ignore
+        if pyi_splash.is_alive():
+            pyi_splash.close()
+    except Exception:
+        pass
