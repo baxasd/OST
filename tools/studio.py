@@ -6,9 +6,10 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
 
-from core.common import data, io
-from core.common.settings import *
-from core.studio.ui_components import MetricGraph, SkeletonLegend
+from core import storage
+from core.config import *
+from core import data
+from core.widgets import MetricGraph, SkeletonLegend
 
 
 class DataPrepPage(QWidget):
@@ -183,7 +184,7 @@ class DataPrepPage(QWidget):
                 self.log("...Initializing Data Engine...")
                 self.init_graph()
                 
-                df, subj, act = io.load_session_data(fn)
+                df, subj, act = storage.load_session_data(fn)
                 
                 self.raw_df = df
                 self.current_subj = subj
@@ -196,8 +197,8 @@ class DataPrepPage(QWidget):
                 self.cmb_joint.addItems(joint_cols)
                 self.cmb_joint.blockSignals(False)
 
-                from core.studio import processing
-                report, needs_repair = processing.PipelineProcessor.validate(self.raw_df)
+                from core import filters
+                report, needs_repair = filters.PipelineProcessor.validate(self.raw_df)
                 self.log(report)
                 
                 if needs_repair: 
@@ -215,25 +216,25 @@ class DataPrepPage(QWidget):
         if self.raw_df is None: 
             return
         
-        from core.studio import processing
+        from core import filters
         df = self.raw_df.copy()
         self.log("\n> Generating Pipeline Preview...")
         
         if self.chk_teleport.isChecked():
             thresh = self.spn_tele_thresh.value()
-            df, count = processing.PipelineProcessor.remove_teleportation(df, threshold=thresh)
+            df, count = filters.PipelineProcessor.remove_teleportation(df, threshold=thresh)
             if count > 0:
                 self.log(f"• Removed {count} teleported joint instances (> {thresh})")
         
         if self.chk_repair.isChecked(): 
-            df = processing.PipelineProcessor.repair(df)
+            df = filters.PipelineProcessor.repair(df)
             self.log("• Applied stable Gap & NaN Interpolation")
             
         if self.chk_smooth.isChecked():
             w = self.spn_win.value()
             if w % 2 == 0: 
                 w += 1
-            df = processing.PipelineProcessor.smooth(df, window=w)
+            df = filters.PipelineProcessor.smooth(df, window=w)
             self.log(f"• Applied Moving Average (w={w})")
             
         self.clean_df = df
@@ -260,7 +261,7 @@ class DataPrepPage(QWidget):
             return
         fn, _ = QFileDialog.getSaveFileName(self, "Save", "clean.csv", "CSV (*.csv)")
         if fn:
-            success, msg = io.export_clean_csv(self.clean_df, fn)
+            success, msg = storage.export_clean_csv(self.clean_df, fn)
             self.log(f"> {msg}")
 
 
@@ -293,7 +294,7 @@ class VisualizerPage(QWidget):
         if self.is_initialized: 
             return
             
-        from core.studio.visuals import SkeletonDisplay
+        from core.render import SkeletonDisplay
         
         self.loading_lbl.setParent(None)
         self.viz = SkeletonDisplay()
@@ -383,7 +384,7 @@ class VisualizerPage(QWidget):
         if not self.is_initialized: 
             return
         
-        from core.studio import metrics 
+        from core import math 
         self.active_session = session
         self.frame_idx = 0
         self.history = {k: [] for k in self.keys}
@@ -401,7 +402,7 @@ class VisualizerPage(QWidget):
         
         if session.frames:
             first_frame = session.frames[0]
-            hip = metrics.get_point(first_frame, "hip_mid")
+            hip = math.get_point(first_frame, "hip_mid")
             if hip: 
                 self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
@@ -410,7 +411,7 @@ class VisualizerPage(QWidget):
         fn, _ = QFileDialog.getOpenFileName(self, "Open Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             try:
-                df, subj, act = io.load_session_data(fn)
+                df, subj, act = storage.load_session_data(fn)
                 session = data.df_to_session(df)
                 self.load_session(session, fn, subj, act)
             except Exception as e: 
@@ -439,10 +440,10 @@ class VisualizerPage(QWidget):
         if not self.active_session or not self.active_session.frames: 
             return
             
-        from core.studio import metrics 
+        from core import math 
         f = self.active_session.frames[self.frame_idx]
         self.viz.update_frame(f)
-        vals = metrics.compute_all_metrics(f)
+        vals = math.compute_all_metrics(f)
 
         for key in self.keys:
             if key in vals and key in self.graphs:
@@ -538,7 +539,7 @@ class UnifiedWorkstation(QMainWindow):
         self.switch_page(1)
         
     def load_data_into_viz(self, df, subj="Unknown", act="Unknown"):
-        from core.common import data
+        from core import data
         session = data.df_to_session(df)
         self.page_viz.load_session(session, "Clean_Data.csv", subj, act)
 

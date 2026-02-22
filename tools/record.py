@@ -2,14 +2,14 @@ import sys
 import os
 import time
 import datetime
-import traceback
+import mediapipe
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap, QFont, QIcon
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, 
                              QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox, 
                              QSizePolicy, QApplication)
 
-from core.common.settings import *
+from core.config import *
 
 class CaptureThread(QThread):
     """
@@ -45,9 +45,9 @@ class CaptureThread(QThread):
         try:
             import cv2
             from sensors.realsense import RealSenseCamera
-            from core.recorder.transforms import get_mean_depth, deproject_pixel_to_point
-            from core.common.io import SessionWriter
-            from core.recorder.pose import PoseEstimator
+            from core.depth import get_mean_depth, deproject_pixel_to_point
+            from core.storage import SessionWriter
+            from core.pose import PoseEstimator
             
             cam = RealSenseCamera(width=640, height=480, fps=30)
             pose = PoseEstimator(model_complexity=self.model_complexity)

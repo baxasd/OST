@@ -1,7 +1,7 @@
 # ost/core/processing.py
 import pandas as pd
 import numpy as np
-from core.common.data import identify_joint_columns
+from core.data import identify_joint_columns
 
 class PipelineProcessor:
     """ Logic for validating and cleaning motion data"""

@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel
-from core.common.settings import *
+from core.config import *
 
 class MetricGraph(QWidget):
     """Compact line graph for Studio Dashboard. Lazy-loads pyqtgraph."""

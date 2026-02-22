@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from core.common.data import Frame, NAME_TO_ID
+from core.data import Frame, NAME_TO_ID
 
 def _get_vec(frame, name_or_id):
     """Internal helper to get numpy vector from frame."""
