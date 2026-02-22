@@ -6,7 +6,6 @@ __pycache__/
 # Distribution / Build
 build/
 dist/
-*.spec
 
 # Virtual Environments
 .venv/
@@ -14,9 +13,6 @@ venv/
 .venv/
 env/
 .env
-
-# PyInstaller
-*.manifest
 
 # IDEs
 .vscode/
