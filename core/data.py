@@ -3,7 +3,9 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
 from datetime import datetime
 
+# ================================================
 # MEDIAPIPE CONSTANTS
+# ================================================
 POSE_LANDMARKS = {
     0: "nose", 1: "left_eye_inner", 2: "left_eye", 3: "left_eye_outer",
     4: "right_eye_inner", 5: "right_eye", 6: "right_eye_outer", 7: "left_ear",
@@ -16,7 +18,9 @@ POSE_LANDMARKS = {
     32: "right_foot_index"
 }
 
+# ================================================
 # Reverse mapping for lookups
+# ================================================
 NAME_TO_ID = {v: k for k, v in POSE_LANDMARKS.items()}
 
 def identify_joint_columns(columns: List[str]) -> List[str]:

@@ -9,7 +9,7 @@ from PyQt6.QtGui import QCursor, QIcon, QPixmap
 if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.config import ICON, VERSION, LOGO, BG_DARK, close_splash
+from core.config import ICON, VERSION, LOGO, BG_DARK, close_splash, ACCENT_COLOR
 
 class OSTLauncher(QMainWindow):
     def __init__(self):
@@ -41,15 +41,15 @@ class OSTLauncher(QMainWindow):
         layout.addWidget(logo_lbl)
         
         sub = QLabel("OSTEO-SKELETAL TRACKER")
-        sub.setStyleSheet("color: #666; font-weight: bold; font-size: 11px; letter-spacing: 3px; margin-bottom: 20px;")
+        sub.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: bold; font-size: 11px; letter-spacing: 3px; margin-bottom: 20px;")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(sub)
         
-        self.btn_rec = self._make_card("NEW RECORDING", "Capture data from sensor", "#167B87")
+        self.btn_rec = self._make_card("NEW RECORDING", "Capture data from sensor", ACCENT_COLOR)
         self.btn_rec.clicked.connect(lambda: self._run_tool("record"))
         layout.addWidget(self.btn_rec)
 
-        self.btn_viz = self._make_card("OPEN STUDIO", "Process & Analyze data", "#0FA6C1")
+        self.btn_viz = self._make_card("OPEN STUDIO", "Process & Analyze data", ACCENT_COLOR)
         self.btn_viz.clicked.connect(lambda: self._run_tool("studio"))
         layout.addWidget(self.btn_viz)
         

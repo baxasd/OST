@@ -1,23 +1,29 @@
 import sys
 import os
 
-# --- APP DIMENSIONS ---
+# ================================================
+# APP DIMENSIONS
+# ================================================
 WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 650
 MIN_WINDOW_WIDTH = 800
 MIN_WINDOW_HEIGHT = 550
 PANEL_WIDTH = 320
 
-# --- UI PALETTE ---
-ACCENT_COLOR = "#0FA6C1"
-ACCENT_HOVER = "#167B87"
+# ================================================
+# UI PALETTE 
+# ================================================
+ACCENT_COLOR = "#ffA826"
+ACCENT_HOVER = "#FF9800"
 BG_DARK = "#18181b"
 BG_PANEL = "#27272a"
 TEXT_MAIN = "#e4e4e7"
 TEXT_DIM = "#a1a1aa"
 BORDER = "#3f3f46"
 
-# --- SKELETON & GRAPH PALETTE ---
+# ================================================
+# SKELETON & GRAPH PALETTE
+# ================================================
 COLOR_BONE_LEFT = "#9e2a2b"
 COLOR_BONE_RIGHT = "#2e86c1"
 COLOR_BONE_CENTER = "#7fb069"
@@ -28,12 +34,16 @@ GRAPH_RIGHT = "#2e86c1"
 GRAPH_CENTER = "#fbbf24"
 GRAPH_Z_AXIS = "#7fb069"
 
-# --- APP STRINGS ---
+# ================================================
+# APP STRINGS
+# ================================================
 APP_NAME = "OST Suite"
-VERSION = "v0.2.0"
-MAX_HISTORY_LENGTH = 40
+VERSION = "v0.2.1"
+MAX_HISTORY_LENGTH = 50
 
-# --- UNIVERSAL CSS THEMES ---
+# ================================================
+# UNIVERSAL CSS THEMES
+# ================================================
 CSS_MAIN_WINDOW = f"QMainWindow {{ background-color: {BG_DARK}; }}"
 CSS_SIDEBAR = f"background-color: {BG_PANEL}; border-left: 1px solid {BORDER}; border-right: 1px solid {BORDER};"
 CSS_HEADER = f"color: {TEXT_MAIN}; font-weight: bold; font-size: 11px; border: none; margin-bottom: 2px;"
@@ -50,9 +60,10 @@ CSS_BTN_OUTLINE = f"""
     QPushButton:disabled {{ border-color: #333; color: #555; }}
 """
 
-
-# --- METRIC GRAPH CONFIGURATIONS ---
-# Format: (Dictionary Key, UI Title, Color, Min Range, Max Range)
+# ================================================
+# METRIC GRAPH CONFIGURATIONS
+# Format: Dictionary Key, UI Title, Color, Min Range, Max Range
+# ================================================
 METRIC_CONFIGS = [
     ('lean_x', "Trunk Lat.", GRAPH_CENTER, -45, 45),
     ('lean_z', "Trunk Depth", GRAPH_Z_AXIS, -45, 45),
@@ -66,11 +77,13 @@ METRIC_CONFIGS = [
     ('r_elb',  "R.Elbow Flex", GRAPH_RIGHT, 0, 180)
 ]
 
-# --- PATH RESOLUTION ---
+# ================================================
+# PATH RESOLUTION
+# ================================================
 def get_base_path():
     if getattr(sys, 'frozen', False):
         return sys._MEIPASS
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 BASE_DIR = get_base_path()
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
@@ -79,7 +92,9 @@ ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
 COMMAND_ICON = os.path.join(ASSETS_DIR, "command.ico")
 LOGO = os.path.join(ASSETS_DIR, "logo-main-whiteText.png")
 
-# --- BOILERPLATE UTILS ---
+# ================================================
+# UTILS
+# ================================================
 def close_splash():
     """Safely closes the PyInstaller splash screen if it exists."""
     try:

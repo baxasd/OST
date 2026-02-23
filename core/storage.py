@@ -20,7 +20,7 @@ class SessionWriter:
         self.writer = None
         self.total_frames = 0
         
-        # --- THE FIX: Define strict column schema ---
+        # --- Define strict column schema ---
         self.schema_columns = ['timestamp']
         for i in range(33):
             self.schema_columns.extend([f"j{i}_x", f"j{i}_y", f"j{i}_z"])
@@ -38,7 +38,7 @@ class SessionWriter:
         if not self.data_buffer:
             return
             
-        # --- THE FIX: Force Pandas to use the exact column structure ---
+        # --- Force Pandas to use the exact column structure ---
         df = pd.DataFrame(self.data_buffer, columns=self.schema_columns)
         table = pa.Table.from_pandas(df)
         
@@ -83,7 +83,6 @@ def export_clean_csv(df: pd.DataFrame, filepath: str):
     except Exception as e:
         return False, f"Export failed: {str(e)}"
     
-
 def load_session_data(filepath: str):
     """
     Universal loader for OST session data.
@@ -92,14 +91,9 @@ def load_session_data(filepath: str):
     Returns:
         tuple: (pd.DataFrame, subject_id, activity)
     """
-    import pandas as pd
-    import os
-    
     subj, act = "Unknown", "Unknown"
 
     if filepath.endswith('.parquet'):
-        import pyarrow.parquet as pq
-        
         # 1. Instantly read Metadata from Footer
         schema = pq.read_schema(filepath)
         if schema.metadata:
@@ -124,3 +118,26 @@ def load_session_data(filepath: str):
         raise ValueError(f"Unsupported file format: {filepath}")
 
     return df, subj, act
+
+def export_analysis_results(df_timeseries, df_stats, base_filepath):
+    """
+    Saves the Timeseries and Summary stats to two linked CSV files 
+    for Excel plotting and Machine Learning.
+    """
+    try:
+        # Strip the .csv extension if the user typed it, so we can append our suffixes safely
+        if base_filepath.endswith('.csv'):
+            base_filepath = base_filepath[:-4]
+        
+        ts_path = f"{base_filepath}_timeseries.csv"
+        stats_path = f"{base_filepath}_summary.csv"
+        
+        # Save Timeseries without an index (cleaner for Excel)
+        df_timeseries.to_csv(ts_path, index=False)
+        
+        # Save Stats WITH the index (because the index contains the labels 'mean', '50%', etc.)
+        df_stats.to_csv(stats_path, index=True) 
+        
+        return True, f"Exported Successfully:\n{os.path.basename(ts_path)}\n{os.path.basename(stats_path)}"
+    except Exception as e:
+        return False, f"Export failed: {str(e)}"

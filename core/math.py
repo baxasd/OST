@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import pandas as pd
 from core.data import Frame, NAME_TO_ID
 
 def _get_vec(frame, name_or_id):
@@ -110,3 +111,29 @@ def compute_all_metrics(f: Frame) -> dict:
         'l_elb':  calculate_joint_angle(f, "left_shoulder", "left_elbow", "left_wrist"),
         'r_elb':  calculate_joint_angle(f, "right_shoulder", "right_elbow", "right_wrist")
     }
+
+def generate_analysis_report(session):
+    """
+    Loops through all frames, computes metrics, and returns:
+    1. A full Timeseries DataFrame (every angle at every frame)
+    2. A Summary Statistics DataFrame (Mean, Median, Std, etc.)
+    """
+    data = []
+    for f in session.frames:
+        metrics_dict = compute_all_metrics(f)
+        metrics_dict['timestamp'] = f.timestamp
+        metrics_dict['frame'] = f.frame_id
+        data.append(metrics_dict)
+    
+    # Create the full Line-Graph timeseries dataset
+    df_timeseries = pd.DataFrame(data)
+    
+    # Reorder columns to ensure timestamp and frame are first
+    cols = ['timestamp', 'frame'] + [c for c in df_timeseries.columns if c not in ['timestamp', 'frame']]
+    df_timeseries = df_timeseries[cols]
+    
+    # Automatically calculate count, mean, std, min, 25%, 50% (median), 75%, and max
+    # We drop timestamp and frame so they don't get averaged.
+    df_stats = df_timeseries.drop(columns=['timestamp', 'frame']).describe()
+    
+    return df_timeseries, df_stats

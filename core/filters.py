@@ -28,13 +28,13 @@ class PipelineProcessor:
         zeros = (df[existing_cols] == 0.0).sum().sum()
         if zeros > 0:
             pct = (zeros / df[existing_cols].size) * 100
-            report.append(f"• Tracking Loss: {pct:.1f}% zeros detected.")
+            report.append(f"Tracking Loss: {pct:.1f}% zeros detected.")
             issues += 1
             
         # Check Gaps
         nans = df[existing_cols].isna().sum().sum()
         if nans > 0:
-            report.append(f"• Data Gaps: {nans} missing values.")
+            report.append(f"Data Gaps: {nans} missing values.")
             issues += 1
 
         # Check Frame Drops
@@ -46,9 +46,9 @@ class PipelineProcessor:
                 issues += 1
 
         if issues == 0:
-            return "✔ DATA INTEGRITY: PASS\nNo obvious tracking issues found.", False
+            return "DATA INTEGRITY: PASS", False
         else:
-            header = f"⚠ ISSUES FOUND ({issues}):"
+            header = f"ISSUES FOUND ({issues}):"
             return header + "\n" + "\n".join(report), True
 
     @staticmethod

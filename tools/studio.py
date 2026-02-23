@@ -6,9 +6,8 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
 
-from core import storage
+from core import data, storage, math, filters
 from core.config import *
-from core import data
 from core.widgets import MetricGraph, SkeletonLegend
 
 
@@ -18,8 +17,6 @@ class DataPrepPage(QWidget):
         self.parent_app = parent_app
         self.raw_df = None
         self.clean_df = None
-        self.current_subj = "Unknown"
-        self.current_act = "Unknown"
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -65,9 +62,7 @@ class DataPrepPage(QWidget):
         self.lbl_file.setStyleSheet(f"color: {ACCENT_COLOR}; font-size: 10px; font-style: italic; border: none;")
         ctrl_lay.addWidget(self.lbl_file)
         
-        line = QFrame()
-        line.setFixedHeight(1)
-        line.setStyleSheet(f"background-color: {BORDER};")
+        line = QFrame(); line.setFixedHeight(1); line.setStyleSheet(f"background-color: {BORDER};")
         ctrl_lay.addWidget(line)
 
         ctrl_lay.addWidget(QLabel("2. PLOT PREVIEW", styleSheet=CSS_HEADER))
@@ -82,23 +77,18 @@ class DataPrepPage(QWidget):
         def add_legend_item(text, color, dotted=False):
             box = QLabel()
             box.setFixedSize(14, 4)
-            if dotted: 
-                box.setStyleSheet(f"border-top: 2px dotted {color}; background: transparent;")
-            else: 
-                box.setStyleSheet(f"background-color: {color};")
+            if dotted: box.setStyleSheet(f"border-top: 2px dotted {color}; background: transparent;")
+            else: box.setStyleSheet(f"background-color: {color};")
             lbl = QLabel(text)
             lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
-            legend_lay.addWidget(box)
-            legend_lay.addWidget(lbl)
+            legend_lay.addWidget(box); legend_lay.addWidget(lbl)
 
         add_legend_item("Raw", "#ff5555", dotted=True)
         legend_lay.addStretch()
         add_legend_item("Clean", "#55ff55")
         ctrl_lay.addLayout(legend_lay)
 
-        line2 = QFrame()
-        line2.setFixedHeight(1)
-        line2.setStyleSheet(f"background-color: {BORDER};")
+        line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background-color: {BORDER};")
         ctrl_lay.addWidget(line2)
 
         ctrl_lay.addWidget(QLabel("3. CLEANING PIPELINE", styleSheet=CSS_HEADER))
@@ -111,9 +101,7 @@ class DataPrepPage(QWidget):
         tele_lay = QHBoxLayout()
         tele_lay.addWidget(QLabel("Distance Threshold:", styleSheet=f"color: {TEXT_DIM}; border: none;"))
         self.spn_tele_thresh = QDoubleSpinBox()
-        self.spn_tele_thresh.setRange(0.01, 10.0)
-        self.spn_tele_thresh.setValue(0.5)
-        self.spn_tele_thresh.setSingleStep(0.1)
+        self.spn_tele_thresh.setRange(0.01, 10.0); self.spn_tele_thresh.setValue(0.5); self.spn_tele_thresh.setSingleStep(0.1)
         self.spn_tele_thresh.setStyleSheet(CSS_INPUT)
         tele_lay.addWidget(self.spn_tele_thresh)
         ctrl_lay.addLayout(tele_lay)
@@ -131,9 +119,7 @@ class DataPrepPage(QWidget):
         smooth_lay = QHBoxLayout()
         smooth_lay.addWidget(QLabel("Window Size:", styleSheet=f"color: {TEXT_DIM}; border: none;"))
         self.spn_win = QSpinBox()
-        self.spn_win.setRange(3, 101)
-        self.spn_win.setValue(5)
-        self.spn_win.setSingleStep(2)
+        self.spn_win.setRange(3, 101); self.spn_win.setValue(5); self.spn_win.setSingleStep(2)
         self.spn_win.setStyleSheet(CSS_INPUT)
         smooth_lay.addWidget(self.spn_win)
         ctrl_lay.addLayout(smooth_lay)
@@ -144,18 +130,13 @@ class DataPrepPage(QWidget):
         self.btn_preview.setStyleSheet(CSS_BTN_OUTLINE)
         self.btn_preview.setEnabled(False)
         ctrl_lay.addWidget(self.btn_preview)
-
-        self.btn_process = QPushButton("COMMIT TO VISUALIZER")
-        self.btn_process.clicked.connect(self.commit_to_viz)
-        self.btn_process.setStyleSheet(CSS_BTN_PRIMARY)
-        self.btn_process.setEnabled(False)
-        ctrl_lay.addWidget(self.btn_process)
         
         ctrl_lay.addStretch()
         
-        self.btn_export = QPushButton("EXPORT CSV")
+        # EXPORT CSV IS NOW THE ONLY WAY TO PROGRESS
+        self.btn_export = QPushButton("EXPORT CLEANED DATA")
         self.btn_export.clicked.connect(self.export_file)
-        self.btn_export.setStyleSheet(CSS_BTN_OUTLINE)
+        self.btn_export.setStyleSheet(CSS_BTN_PRIMARY)
         self.btn_export.setEnabled(False)
         ctrl_lay.addWidget(self.btn_export)
         
@@ -185,10 +166,7 @@ class DataPrepPage(QWidget):
                 self.init_graph()
                 
                 df, subj, act = storage.load_session_data(fn)
-                
                 self.raw_df = df
-                self.current_subj = subj
-                self.current_act = act
                 self.log(f">> Metadata Found: Subject {subj}, Activity {act}")
 
                 self.cmb_joint.blockSignals(True)
@@ -197,34 +175,28 @@ class DataPrepPage(QWidget):
                 self.cmb_joint.addItems(joint_cols)
                 self.cmb_joint.blockSignals(False)
 
-                from core import filters
                 report, needs_repair = filters.PipelineProcessor.validate(self.raw_df)
                 self.log(report)
-                
                 if needs_repair: 
                     self.log(">> Auto-repair highly recommended.")
                 
                 self.lbl_file.setText(os.path.basename(fn))
                 self.btn_preview.setEnabled(True)
-                self.btn_process.setEnabled(True)
                 
                 self.run_preview()
             except Exception as e: 
                 self.log(f"Error: {e}")
 
     def run_preview(self):
-        if self.raw_df is None: 
-            return
+        if self.raw_df is None: return
         
-        from core import filters
         df = self.raw_df.copy()
         self.log("\n> Generating Pipeline Preview...")
         
         if self.chk_teleport.isChecked():
             thresh = self.spn_tele_thresh.value()
             df, count = filters.PipelineProcessor.remove_teleportation(df, threshold=thresh)
-            if count > 0:
-                self.log(f"• Removed {count} teleported joint instances (> {thresh})")
+            if count > 0: self.log(f"• Removed {count} teleported joint instances (> {thresh})")
         
         if self.chk_repair.isChecked(): 
             df = filters.PipelineProcessor.repair(df)
@@ -232,8 +204,7 @@ class DataPrepPage(QWidget):
             
         if self.chk_smooth.isChecked():
             w = self.spn_win.value()
-            if w % 2 == 0: 
-                w += 1
+            if w % 2 == 0: w += 1
             df = filters.PipelineProcessor.smooth(df, window=w)
             self.log(f"• Applied Moving Average (w={w})")
             
@@ -242,24 +213,16 @@ class DataPrepPage(QWidget):
         self.update_graph()
 
     def update_graph(self):
-        if self.raw_df is None or self.clean_df is None or self.plot_widget is None: 
-            return
+        if self.raw_df is None or self.clean_df is None or self.plot_widget is None: return
         
         joint = self.cmb_joint.currentText()
         if joint and joint in self.raw_df.columns:
             self.raw_curve.setData(self.raw_df[joint].values)
             self.clean_curve.setData(self.clean_df[joint].values)
 
-    def commit_to_viz(self):
-        if self.clean_df is None:
-            self.run_preview()
-        self.parent_app.load_data_into_viz(self.clean_df, self.current_subj, self.current_act)
-        self.parent_app.switch_to_viz()
-
     def export_file(self):
-        if self.clean_df is None: 
-            return
-        fn, _ = QFileDialog.getSaveFileName(self, "Save", "clean.csv", "CSV (*.csv)")
+        if self.clean_df is None: return
+        fn, _ = QFileDialog.getSaveFileName(self, "Save Clean Data", "clean_data.csv", "CSV (*.csv)")
         if fn:
             success, msg = storage.export_clean_csv(self.clean_df, fn)
             self.log(f"> {msg}")
@@ -291,8 +254,7 @@ class VisualizerPage(QWidget):
         self.is_initialized = False
 
     def init_graphics(self):
-        if self.is_initialized: 
-            return
+        if self.is_initialized: return
             
         from core.render import SkeletonDisplay
         
@@ -355,6 +317,7 @@ class VisualizerPage(QWidget):
         scroll.setWidget(scroll_content)
         dash_layout.addWidget(scroll)
         
+        # FOOTER WITH DUAL BUTTONS
         footer = QFrame()
         footer.setStyleSheet(f"background-color: {BG_PANEL}; border-top: 1px solid {BORDER}; border-left: none; border-right: none; border-bottom: none;")
         f_lay = QVBoxLayout(footer)
@@ -370,21 +333,29 @@ class VisualizerPage(QWidget):
         instr.setAlignment(Qt.AlignmentFlag.AlignCenter)
         f_lay.addWidget(instr)
         
-        self.btn_load_ext = QPushButton("LOAD RECORDING")
+        btn_row = QHBoxLayout()
+        self.btn_load_ext = QPushButton("LOAD DATA")
         self.btn_load_ext.clicked.connect(self.load_external)
         self.btn_load_ext.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load_ext.setStyleSheet(CSS_BTN_PRIMARY)
-        f_lay.addWidget(self.btn_load_ext)
+        self.btn_load_ext.setStyleSheet(CSS_BTN_OUTLINE)
+        
+        self.btn_export_results = QPushButton("EXPORT RESULTS")
+        self.btn_export_results.clicked.connect(self.export_results)
+        self.btn_export_results.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_results.setStyleSheet(CSS_BTN_PRIMARY)
+        self.btn_export_results.setEnabled(False) # Disabled until data loads
+        
+        btn_row.addWidget(self.btn_load_ext)
+        btn_row.addWidget(self.btn_export_results)
+        f_lay.addLayout(btn_row)
         
         dash_layout.addWidget(footer)
         self.layout.addWidget(dash_container)
         self.is_initialized = True
 
     def load_session(self, session, filename="", subj="Unknown", act="Unknown"):
-        if not self.is_initialized: 
-            return
+        if not self.is_initialized: return
         
-        from core import math 
         self.active_session = session
         self.frame_idx = 0
         self.history = {k: [] for k in self.keys}
@@ -400,15 +371,17 @@ class VisualizerPage(QWidget):
         self.playing = True
         self.timer.start()
         
+        # Unlock the export button since data is ready!
+        self.btn_export_results.setEnabled(True)
+        
         if session.frames:
             first_frame = session.frames[0]
             hip = math.get_point(first_frame, "hip_mid")
-            if hip: 
-                self.viz.center_view(hip[0], -hip[1]) 
+            if hip: self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
 
     def load_external(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Open Data", "", "Data Files (*.parquet *.csv)")
+        fn, _ = QFileDialog.getOpenFileName(self, "Open Cleaned Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             try:
                 df, subj, act = storage.load_session_data(fn)
@@ -417,30 +390,40 @@ class VisualizerPage(QWidget):
             except Exception as e: 
                 QMessageBox.critical(self, "Error", str(e))
 
+    def export_results(self):
+        """Generates the Machine Learning Ready Datasets"""
+        if not self.active_session: return
+        
+        fn, _ = QFileDialog.getSaveFileName(self, "Save Analysis Report", "Analysis_Report", "CSV (*.csv)")
+        if fn:
+            # 1. Math engine crunches the numbers
+            ts_df, stats_df = math.generate_analysis_report(self.active_session)
+            
+            # 2. Storage engine dumps them to disk
+            success, msg = storage.export_analysis_results(ts_df, stats_df, fn)
+            
+            if success:
+                QMessageBox.information(self, "Export Success", msg)
+            else:
+                QMessageBox.critical(self, "Export Failed", msg)
+
     def toggle_play(self):
-        if not self.is_initialized: 
-            return
+        if not self.is_initialized: return
         self.playing = not self.playing
-        if self.playing: 
-            self.timer.start()
-        else: 
-            self.timer.stop()
+        if self.playing: self.timer.start()
+        else: self.timer.stop()
         
     def step(self, delta):
-        if not self.is_initialized: 
-            return
+        if not self.is_initialized: return
         self.playing = False
         self.timer.stop()
-        if not self.active_session: 
-            return
+        if not self.active_session: return
         self.frame_idx = (self.frame_idx + delta) % len(self.active_session.frames)
         self.loop(update_idx=False)
 
     def loop(self, update_idx=True):
-        if not self.active_session or not self.active_session.frames: 
-            return
+        if not self.active_session or not self.active_session.frames: return
             
-        from core import math 
         f = self.active_session.frames[self.frame_idx]
         self.viz.update_frame(f)
         vals = math.compute_all_metrics(f)
@@ -464,8 +447,7 @@ class UnifiedWorkstation(QMainWindow):
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setStyleSheet(CSS_MAIN_WINDOW)
         
-        if os.path.exists(ICON): 
-            self.setWindowIcon(QIcon(ICON))
+        if os.path.exists(ICON): self.setWindowIcon(QIcon(ICON))
         
         central = QWidget()
         self.setCentralWidget(central)
@@ -534,14 +516,6 @@ class UnifiedWorkstation(QMainWindow):
         self.stack.setCurrentIndex(index)
         self.btn_prep.setChecked(index == 0)
         self.btn_viz.setChecked(index == 1)
-
-    def switch_to_viz(self): 
-        self.switch_page(1)
-        
-    def load_data_into_viz(self, df, subj="Unknown", act="Unknown"):
-        from core import data
-        session = data.df_to_session(df)
-        self.page_viz.load_session(session, "Clean_Data.csv", subj, act)
 
     def keyPressEvent(self, event):
         if self.stack.currentIndex() == 1: 
