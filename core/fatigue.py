@@ -1,77 +1,78 @@
 import numpy as np
 import pandas as pd
 from scipy.spatial import distance
-from scipy.stats import linregress
 
 class FatigueAnalyzer:
-    def __init__(self, df, fps=15):
-        self.df = df.copy()
+    def __init__(self, df_timeseries, fps=15, baseline_mins=5, rolling_window_sec=60):
+        self.df = df_timeseries.copy() 
         self.fps = fps
+        self.baseline_frames = int(baseline_mins * 60 * fps)
+        self.rolling_frames = int(rolling_window_sec * fps)
         self.metric_cols = [c for c in self.df.columns if c not in ['timestamp', 'frame']]
         
-        # 5-second window for smoothing so we keep the "swings" but remove jitter
-        self.smooth_win = int(5 * fps)
+        self.baseline_mean = None; self.baseline_std = None
+        self.cov_matrix = None; self.inv_cov_matrix = None
 
-    def analyze(self):
-        """Main execution loop for the new analysis requirements."""
-        # 1. Smooth all data
-        rolling = self.df[self.metric_cols].rolling(window=self.smooth_win, min_periods=1).mean()
+    def run_pipeline(self):
+        self._calculate_baseline()
+        self._calculate_rolling_metrics()
+        self._calculate_mahalanobis()
+        self._calculate_fii()
+        summary_df, onset_min = self._generate_summary()
+        adv_metrics = self._calculate_advanced_metrics() 
         
-        # Save smoothed back to df for plotting
+        return self.df, summary_df, onset_min, adv_metrics
+
+    def _calculate_baseline(self):
+        baseline_data = self.df.iloc[:self.baseline_frames][self.metric_cols]
+        self.baseline_mean = baseline_data.mean()
+        self.baseline_std = baseline_data.std()
+        self.cov_matrix = np.cov(baseline_data.T)
+        self.inv_cov_matrix = np.linalg.pinv(self.cov_matrix)
+
+    def _calculate_rolling_metrics(self):
+        rolling_means = self.df[self.metric_cols].rolling(window=self.rolling_frames, min_periods=1).mean()
         for col in self.metric_cols:
-            self.df[f'{col}_smooth'] = rolling[col]
+            self.df[f'{col}_zscore'] = (rolling_means[col] - self.baseline_mean[col]) / self.baseline_std[col]
+        self.smoothed_data = rolling_means
 
-        # 2. Calculate Mahalanobis (Overall Drift)
-        self._add_mahalanobis(rolling)
-        
-        # 3. Calculate Trends (Linear Regression for Trunk)
-        trends = self._calculate_trends(rolling)
-        
-        # 4. Calculate Symmetry (Dominance)
-        # We compare the rolling averages of Left vs Right
-        self.df['shoulder_sym'] = rolling['l_sho'] - rolling['r_sho']
-        self.df['hip_sym'] = rolling['l_hip'] - rolling['r_hip']
-        
-        # Determine Dominance
-        # If left is generally higher/more extended, Left is dominant
-        dom_sho = "Left" if self.df['shoulder_sym'].mean() > 0 else "Right"
-        dom_hip = "Left" if self.df['hip_sym'].mean() > 0 else "Right"
-        dominance = {'shoulder': dom_sho, 'hip': dom_hip}
-        
-        return self.df, trends, dominance
-
-    def _add_mahalanobis(self, rolling_df):
-        """Computes drift from the first 5 minutes."""
-        baseline_frames = int(5 * 60 * self.fps)
-        
-        # Fallback if the trial is shorter than 5 minutes
-        if len(rolling_df) < baseline_frames:
-            baseline_frames = len(rolling_df) // 2 
-            
-        baseline = rolling_df.iloc[:baseline_frames]
-        
-        mu = baseline.mean().values
-        # Pseudo-inverse covariance
-        inv_cov = np.linalg.pinv(np.cov(baseline.T))
-        
+    def _calculate_mahalanobis(self):
+        centroid = self.baseline_mean.values
         distances = []
-        for _, row in rolling_df.iterrows():
-            if row.isnull().any():
+        for index, row in self.smoothed_data.iterrows():
+            if pd.isna(row.iloc[0]):
                 distances.append(0)
-            else:
-                distances.append(distance.mahalanobis(row.values, mu, inv_cov))
-                
-        self.df['mahalanobis'] = distances
+                continue
+            distances.append(distance.mahalanobis(row.values, centroid, self.inv_cov_matrix))
+        self.df['mahalanobis_dist'] = distances
 
-    def _calculate_trends(self, rolling_df):
-        """Calculates Linear Regression lines for Trunk Leans."""
-        trends = {}
-        x = np.arange(len(rolling_df))
+    def _calculate_fii(self):
+        z_cols = [c for c in self.df.columns if c.endswith('_zscore')]
+        self.df['mean_abs_z'] = self.df[z_cols].abs().mean(axis=1)
+        self.df['norm_mahalanobis'] = self.df['mahalanobis_dist'] / len(self.metric_cols)
+        self.df['FII'] = self.df['norm_mahalanobis'] + self.df['mean_abs_z']
+
+    def _generate_summary(self):
+        self.df['minute'] = (self.df['timestamp'] // 60).astype(int) + 1
+        summary_df = self.df.groupby('minute').agg(FII=('FII', 'mean'), Mahalanobis=('mahalanobis_dist', 'mean')).reset_index()
+        onset_df = summary_df[summary_df['FII'] > 2.0]
+        fatigue_onset_min = onset_df['minute'].iloc[0] if not onset_df.empty else None
+        return summary_df, fatigue_onset_min
+
+    def _calculate_advanced_metrics(self):
+        """Calculates per-minute slopes and brutally detailed descriptive stats for all columns."""
+        metrics = {}
+        t_sec = self.df['timestamp'].values
         
-        for col in ['lean_x', 'lean_z']:
-            y = rolling_df[col].fillna(0).values
-            slope, intercept, _, _, _ = linregress(x, y)
-            trends[col] = (slope * x) + intercept
-            trends[f'{col}_slope'] = slope
-            
-        return trends
+        # 1. Calculate the Rate of Change (Slope per minute) for every single metric
+        if len(t_sec) > 1:
+            for col in self.metric_cols + ['mahalanobis_dist']:
+                metrics[f'slope_{col}'] = np.polyfit(t_sec, self.df[col].fillna(0), 1)[0] * 60
+        else:
+            for col in self.metric_cols + ['mahalanobis_dist']:
+                metrics[f'slope_{col}'] = 0.0
+
+        # 2. Extract standard pandas describe() to merge into our console text
+        safe_df = self.df.drop(columns=['timestamp', 'frame', 'minute', 'norm_mahalanobis', 'mean_abs_z', 'FII'], errors='ignore')
+        metrics['describe'] = safe_df.describe().T
+        return metrics
