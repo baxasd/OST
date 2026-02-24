@@ -1,7 +1,6 @@
 import sys
 import os
 import traceback
-import pandas as pd
 
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
@@ -11,7 +10,6 @@ from core import data, storage, math, filters
 from core.config import *
 from core.widgets import MetricGraph, SkeletonLegend
 
-# Import the new fatigue analyzer
 try:
     from core.fatigue import FatigueAnalyzer
 except ImportError:
@@ -142,7 +140,6 @@ class DataPrepPage(QWidget):
         
         ctrl_lay.addStretch()
         
-        # CHANGED: Passes data in-memory instead of saving
         self.btn_send_viz = QPushButton("SEND TO VISUALIZER")
         self.btn_send_viz.clicked.connect(self.send_to_viz)
         self.btn_send_viz.setStyleSheet(CSS_BTN_PRIMARY)
@@ -348,7 +345,6 @@ class VisualizerPage(QWidget):
         self.btn_load_ext.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load_ext.setStyleSheet(CSS_BTN_OUTLINE)
         
-        # CHANGED: Passes data to Analysis tab
         self.btn_analyze = QPushButton("RUN FATIGUE ANALYSIS")
         self.btn_analyze.clicked.connect(self.trigger_analysis)
         self.btn_analyze.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -440,99 +436,165 @@ class AnalysisPage(QWidget):
     def __init__(self):
         super().__init__()
         self.full_df = None
-        self.summary_df = None
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(15, 15, 15, 15)
         
-        # Upper Layout for Plots
-        plot_lay = QHBoxLayout()
+        # Header
+        self.lbl_title = QLabel("Post-Trial Biomechanical Analysis")
+        self.lbl_title.setStyleSheet("font-size: 20px; font-weight: bold; color: white;")
+        layout.addWidget(self.lbl_title)
+        
+        # Create a scroll area so the graphs aren't squished
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; }")
+        
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
+        self.grid = QGridLayout(scroll_content)
+        self.grid.setSpacing(15)
+        
         import pyqtgraph as pg
         
-        self.fii_plot = pg.PlotWidget(title="Fatigue Instability Index (FII)")
-        self.fii_plot.setBackground(BG_PANEL)
-        self.fii_plot.showGrid(x=True, y=True, alpha=0.3)
-        self.fii_curve = self.fii_plot.plot(pen=pg.mkPen('#ff5555', width=2))
+        # 1. Mahalanobis Distance
+        self.p_mahal = self._setup_plot("1. Overall Body Drift (Mahalanobis)", "Frames", "Distance")
+        self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT_COLOR, width=2))
         
-        self.maha_plot = pg.PlotWidget(title="Mahalanobis Distance (Multivariate Drift)")
-        self.maha_plot.setBackground(BG_PANEL)
-        self.maha_plot.showGrid(x=True, y=True, alpha=0.3)
-        self.maha_curve = self.maha_plot.plot(pen=pg.mkPen('#55ff55', width=2))
+        # 2. Trunk Lean & Trend
+        self.p_lean = self._setup_plot("2. Trunk Leans with Regression Trend", "Frames", "Degrees")
+        self.p_lean.addLegend(offset=(10, 10))
+        self.c_lean_x = self.p_lean.plot(pen=pg.mkPen('#ff5555', width=1.5), name="Lean Fwd/Back (X)")
+        self.c_lean_z = self.p_lean.plot(pen=pg.mkPen('#5555ff', width=1.5), name="Lean Sideways (Z)")
+        self.c_trend_x = self.p_lean.plot(pen=pg.mkPen('#ffaaaa', width=2, style=Qt.PenStyle.DashLine), name="Trend X")
+        self.c_trend_z = self.p_lean.plot(pen=pg.mkPen('#aaaaff', width=2, style=Qt.PenStyle.DashLine), name="Trend Z")
         
-        plot_lay.addWidget(self.fii_plot)
-        plot_lay.addWidget(self.maha_plot)
-        layout.addLayout(plot_lay, stretch=2)
+        # 3. Shoulder Swings
+        self.p_swings = self._setup_plot("3. Shoulder Swings (Smoothed)", "Frames", "Degrees")
+        self.p_swings.addLegend(offset=(10, 10))
+        self.c_sho_l = self.p_swings.plot(pen=pg.mkPen('#55ff55', width=1.5), name="Left Shoulder")
+        self.c_sho_r = self.p_swings.plot(pen=pg.mkPen('#ffff55', width=1.5), name="Right Shoulder")
         
-        # Lower Layout for text stats and Export
-        bot_lay = QHBoxLayout()
-        
-        self.txt_log = QTextEdit()
-        self.txt_log.setReadOnly(True)
-        self.txt_log.setStyleSheet(f"background-color: {BG_PANEL}; color: {TEXT_DIM}; border: 1px solid {BORDER}; font-family: Consolas; font-size: 13px; padding: 10px;")
-        bot_lay.addWidget(self.txt_log, stretch=1)
-        
-        btn_lay = QVBoxLayout()
-        self.btn_export = QPushButton("EXPORT FINAL REPORT")
-        self.btn_export.clicked.connect(self.export_report)
-        self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export.setStyleSheet(CSS_BTN_PRIMARY)
-        self.btn_export.setMinimumHeight(50)
-        self.btn_export.setEnabled(False)
-        
-        btn_lay.addStretch()
-        btn_lay.addWidget(self.btn_export)
-        bot_lay.addLayout(btn_lay)
-        
-        layout.addLayout(bot_lay, stretch=1)
+        # 4. Knee & Elbow Angles
+        self.p_joints = self._setup_plot("4. Knee & Elbow Ranges", "Frames", "Degrees")
+        self.p_joints.addLegend(offset=(10, 10))
+        self.c_knee_l = self.p_joints.plot(pen=pg.mkPen('#ff5555', width=1), name="Left Knee")
+        self.c_knee_r = self.p_joints.plot(pen=pg.mkPen('#aa0000', width=1), name="Right Knee")
+        self.c_elb_l = self.p_joints.plot(pen=pg.mkPen('#55ff55', width=1), name="Left Elbow")
+        self.c_elb_r = self.p_joints.plot(pen=pg.mkPen('#00aa00', width=1), name="Right Elbow")
 
-    def process_session(self, session, subj="Unknown", act="Unknown"):
-        self.txt_log.clear()
-        self.txt_log.append(f"Starting Fatigue Analysis for Subject: {subj}")
-        self.txt_log.append("Crunching full timeseries math...")
+        # 5. Symmetry (L vs R Difference)
+        self.p_sym = self._setup_plot("5. L-R Symmetry (Above 0 = Left Dominant)", "Frames", "Delta Degrees")
+        self.p_sym.addLegend(offset=(10, 10))
+        self.p_sym.addLine(y=0, pen=pg.mkPen('#ffffff', width=1, style=Qt.PenStyle.DotLine))
+        self.c_sym_sho = self.p_sym.plot(pen=pg.mkPen('#ff55ff', width=1.5), name="Shoulder Symmetry")
+        self.c_sym_hip = self.p_sym.plot(pen=pg.mkPen('#55ffff', width=1.5), name="Hip Symmetry")
+        
+        # Place them in a 2-column Grid
+        self.grid.addWidget(self.p_mahal, 0, 0)
+        self.grid.addWidget(self.p_lean, 0, 1)
+        self.grid.addWidget(self.p_swings, 1, 0)
+        self.grid.addWidget(self.p_joints, 1, 1)
+        self.grid.addWidget(self.p_sym, 2, 0)
+
+        # 6. Text Summary & Export Box
+        sum_widget = QWidget()
+        sum_lay = QVBoxLayout(sum_widget)
+        sum_lay.setContentsMargins(0, 0, 0, 0)
+        
+        self.txt_summary = QTextEdit()
+        self.txt_summary.setReadOnly(True)
+        self.txt_summary.setStyleSheet(f"background: {BG_PANEL}; border: 1px solid {BORDER}; color: {TEXT_MAIN}; padding: 10px; font-size: 13px;")
+        sum_lay.addWidget(self.txt_summary)
+        
+        self.btn_export = QPushButton("SAVE ANALYSIS REPORT (.CSV)")
+        self.btn_export.setStyleSheet(CSS_BTN_PRIMARY)
+        self.btn_export.clicked.connect(self.export_data)
+        self.btn_export.setEnabled(False)
+        self.btn_export.setMinimumHeight(40)
+        sum_lay.addWidget(self.btn_export)
+        
+        self.grid.addWidget(sum_widget, 2, 1)
+
+        # Apply grid heights to look even
+        for row in range(3):
+            self.grid.setRowMinimumHeight(row, 280)
+
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+    def _setup_plot(self, title, x_lbl, y_lbl):
+        import pyqtgraph as pg
+        p = pg.PlotWidget(title=title)
+        p.setBackground(BG_PANEL)
+        p.setLabel('bottom', x_lbl)
+        p.setLabel('left', y_lbl)
+        p.showGrid(x=True, y=True, alpha=0.2)
+        return p
+
+    def process_session(self, session, subj, act):
+        if not FatigueAnalyzer:
+            self.txt_summary.setText("❌ Error: core/fatigue.py not found.")
+            return
+            
+        self.txt_summary.setText(f"Crunching full timeseries math for Subject {subj}...")
         QApplication.processEvents()
         
         try:
-            # 1. Get raw mathematical output
-            ts_df, stats_df = math.generate_analysis_report(session)
+            # 1. Math engine crunches numbers
+            ts_df, _ = math.generate_analysis_report(session)
             
-            # 2. Run the medical-grade fatigue baseline algorithm
-            if FatigueAnalyzer:
-                analyzer = FatigueAnalyzer(ts_df, fps=session.fps)
-                self.full_df, self.summary_df, onset_min = analyzer.run_pipeline()
-                
-                # 3. Plot the data
-                self.fii_curve.setData(self.full_df['FII'].dropna().values)
-                self.maha_curve.setData(self.full_df['mahalanobis_dist'].dropna().values)
-                
-                # 4. Display log results
-                self.txt_log.append(f"✅ Multivariate Baseline Established (First 5 mins).")
-                self.txt_log.append(f"✅ Calculated covariance across {len(analyzer.metric_cols)} joints.")
-                
-                if onset_min:
-                    self.txt_log.append(f"\n🚨 FATIGUE ONSET DETECTED at MINUTE {onset_min} 🚨")
-                    self.txt_log.append("The subject's mechanics deviated > 2.0 Z-scores from baseline.")
-                else:
-                    self.txt_log.append("\n✅ Subject maintained stable gait through entire trial.")
-                
-                self.btn_export.setEnabled(True)
-            else:
-                self.txt_log.append("\n❌ Error: core.fatigue module not found.")
-                
+            # 2. Fatigue engine creates trends & smoothing
+            analyzer = FatigueAnalyzer(ts_df, fps=session.fps)
+            self.full_df, trends, dom = analyzer.analyze()
+            
+            # 3. Update the Graphs
+            self.c_mahal.setData(self.full_df['mahalanobis'].values)
+            
+            self.c_lean_x.setData(self.full_df['lean_x_smooth'].values)
+            self.c_lean_z.setData(self.full_df['lean_z_smooth'].values)
+            self.c_trend_x.setData(trends['lean_x'])
+            self.c_trend_z.setData(trends['lean_z'])
+            
+            self.c_sho_l.setData(self.full_df['l_sho_smooth'].values)
+            self.c_sho_r.setData(self.full_df['r_sho_smooth'].values)
+            
+            self.c_knee_l.setData(self.full_df['l_knee_smooth'].values)
+            self.c_knee_r.setData(self.full_df['r_knee_smooth'].values)
+            self.c_elb_l.setData(self.full_df['l_elb_smooth'].values)
+            self.c_elb_r.setData(self.full_df['r_elb_smooth'].values)
+            
+            self.c_sym_sho.setData(self.full_df['shoulder_sym'].values)
+            self.c_sym_hip.setData(self.full_df['hip_sym'].values)
+            
+            # 4. Generate Plain-English Medical Summary
+            summary = f"<b>SUBJECT {subj} ({act})</b><br><br>"
+            summary += f"<b>Dominance:</b><br>"
+            summary += f"• Shoulder Swing: {dom['shoulder']} Dominant<br>"
+            summary += f"• Hip Drive: {dom['hip']} Dominant<br><br>"
+            
+            summary += f"<b>Fatigue Trends (Trunk Lean):</b><br>"
+            # Multiply slope by total frames to get the total degrees shifted
+            total_x_shift = trends['lean_x_slope'] * len(self.full_df)
+            total_z_shift = trends['lean_z_slope'] * len(self.full_df)
+            
+            summary += f"• Fwd/Back Lean shifted by {total_x_shift:+.2f}° over trial.<br>"
+            summary += f"• Sideways Lean shifted by {total_z_shift:+.2f}° over trial."
+            
+            self.txt_summary.setHtml(summary)
+            self.btn_export.setEnabled(True)
+            
         except Exception as e:
-            self.txt_log.append(f"\n❌ Error during analysis: {str(e)}")
+            self.txt_summary.setText(f"❌ Error during analysis: {str(e)}")
             traceback.print_exc()
 
-    def export_report(self):
-        if self.summary_df is None: return
-        fn, _ = QFileDialog.getSaveFileName(self, "Save Fatigue Report", "Fatigue_Summary.csv", "CSV (*.csv)")
+    def export_data(self):
+        if self.full_df is None: return
+        fn, _ = QFileDialog.getSaveFileName(self, "Save Analysis Data", "Analysis_Trends.csv", "CSV (*.csv)")
         if fn:
             try:
-                # Save both full and minute-by-minute
-                base_name = fn.replace(".csv", "")
-                self.summary_df.to_csv(f"{base_name}_Minute_Summary.csv", index=False)
-                self.full_df.to_csv(f"{base_name}_Full_Timeseries.csv", index=False)
-                QMessageBox.information(self, "Export Success", "Files successfully exported for statistical review.")
+                self.full_df.to_csv(fn, index=False)
+                QMessageBox.information(self, "Export Success", "Detailed analysis saved.")
             except Exception as e:
                 QMessageBox.critical(self, "Export Failed", str(e))
 
@@ -565,7 +627,6 @@ class UnifiedWorkstation(QMainWindow):
         title.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: 900; font-size: 16px; margin-right: 20px; border: none;")
         nav_lay.addWidget(title)
         
-        # ADDED: 3 Navigation Buttons
         self.btn_prep = self._nav_btn("DATA STUDIO")
         self.btn_viz = self._nav_btn("VISUALIZER")
         self.btn_analysis = self._nav_btn("ANALYSIS")
@@ -623,19 +684,16 @@ class UnifiedWorkstation(QMainWindow):
         self.btn_analysis.setChecked(index == 2)
         
     def load_data_into_viz(self, df, subj="Unknown", act="Unknown"):
-        """Passes cleaned data from Data Studio directly to Visualizer"""
         session = data.df_to_session(df)
         self.page_viz.load_session(session, "Cleaned_Data_In_Memory", subj, act)
         self.switch_page(1)
         
     def run_fatigue_analysis(self):
-        """Passes visualizer session directly to Analysis tab"""
         session = self.page_viz.active_session
         if session:
             subj = self.page_viz.info_vals['lbl_subj'].text()
             act = self.page_viz.info_vals['lbl_act'].text()
             self.switch_page(2)
-            # Process slightly after switching so UI paints the switch first
             QTimer.singleShot(50, lambda: self.page_analysis.process_session(session, subj, act))
 
     def keyPressEvent(self, event):
@@ -651,7 +709,8 @@ class UnifiedWorkstation(QMainWindow):
                 self.page_viz.step(1)
         super().keyPressEvent(event)
 
-if __name__ == "__main__":  
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     close_splash()
     w = UnifiedWorkstation()
