@@ -105,7 +105,7 @@ class OSTLauncher(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Missing component:\n{exe_path}")
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            script_path = os.path.join(base_dir, "tools", f"{tool_name}.py")
+            script_path = os.path.join(base_dir, "apps", f"{tool_name}.py")
             env["PYTHONPATH"] = base_dir + os.pathsep + env.get("PYTHONPATH", "")
             
             if os.path.exists(script_path):

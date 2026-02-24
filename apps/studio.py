@@ -1,6 +1,7 @@
 import sys
 import os
 import traceback
+import pandas as pd
 
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
@@ -10,6 +11,12 @@ from core import data, storage, math, filters
 from core.config import *
 from core.widgets import MetricGraph, SkeletonLegend
 
+# Import the new fatigue analyzer
+try:
+    from core.fatigue import FatigueAnalyzer
+except ImportError:
+    FatigueAnalyzer = None
+
 
 class DataPrepPage(QWidget):
     def __init__(self, parent_app):
@@ -17,6 +24,8 @@ class DataPrepPage(QWidget):
         self.parent_app = parent_app
         self.raw_df = None
         self.clean_df = None
+        self.current_subj = "Unknown"
+        self.current_act = "Unknown"
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -133,12 +142,12 @@ class DataPrepPage(QWidget):
         
         ctrl_lay.addStretch()
         
-        # EXPORT CSV IS NOW THE ONLY WAY TO PROGRESS
-        self.btn_export = QPushButton("EXPORT CLEANED DATA")
-        self.btn_export.clicked.connect(self.export_file)
-        self.btn_export.setStyleSheet(CSS_BTN_PRIMARY)
-        self.btn_export.setEnabled(False)
-        ctrl_lay.addWidget(self.btn_export)
+        # CHANGED: Passes data in-memory instead of saving
+        self.btn_send_viz = QPushButton("SEND TO VISUALIZER")
+        self.btn_send_viz.clicked.connect(self.send_to_viz)
+        self.btn_send_viz.setStyleSheet(CSS_BTN_PRIMARY)
+        self.btn_send_viz.setEnabled(False)
+        ctrl_lay.addWidget(self.btn_send_viz)
         
         layout.addWidget(ctrl_panel)
 
@@ -167,6 +176,9 @@ class DataPrepPage(QWidget):
                 
                 df, subj, act = storage.load_session_data(fn)
                 self.raw_df = df
+                self.current_subj = subj
+                self.current_act = act
+                
                 self.log(f">> Metadata Found: Subject {subj}, Activity {act}")
 
                 self.cmb_joint.blockSignals(True)
@@ -209,7 +221,7 @@ class DataPrepPage(QWidget):
             self.log(f"• Applied Moving Average (w={w})")
             
         self.clean_df = df
-        self.btn_export.setEnabled(True)
+        self.btn_send_viz.setEnabled(True)
         self.update_graph()
 
     def update_graph(self):
@@ -220,17 +232,15 @@ class DataPrepPage(QWidget):
             self.raw_curve.setData(self.raw_df[joint].values)
             self.clean_curve.setData(self.clean_df[joint].values)
 
-    def export_file(self):
+    def send_to_viz(self):
         if self.clean_df is None: return
-        fn, _ = QFileDialog.getSaveFileName(self, "Save Clean Data", "clean_data.csv", "CSV (*.csv)")
-        if fn:
-            success, msg = storage.export_clean_csv(self.clean_df, fn)
-            self.log(f"> {msg}")
+        self.parent_app.load_data_into_viz(self.clean_df, self.current_subj, self.current_act)
 
 
 class VisualizerPage(QWidget):
-    def __init__(self):
+    def __init__(self, parent_app):
         super().__init__()
+        self.parent_app = parent_app
         self.active_session = None
         self.frame_idx = 0
         self.playing = False
@@ -317,7 +327,6 @@ class VisualizerPage(QWidget):
         scroll.setWidget(scroll_content)
         dash_layout.addWidget(scroll)
         
-        # FOOTER WITH DUAL BUTTONS
         footer = QFrame()
         footer.setStyleSheet(f"background-color: {BG_PANEL}; border-top: 1px solid {BORDER}; border-left: none; border-right: none; border-bottom: none;")
         f_lay = QVBoxLayout(footer)
@@ -339,14 +348,15 @@ class VisualizerPage(QWidget):
         self.btn_load_ext.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load_ext.setStyleSheet(CSS_BTN_OUTLINE)
         
-        self.btn_export_results = QPushButton("EXPORT RESULTS")
-        self.btn_export_results.clicked.connect(self.export_results)
-        self.btn_export_results.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export_results.setStyleSheet(CSS_BTN_PRIMARY)
-        self.btn_export_results.setEnabled(False) # Disabled until data loads
+        # CHANGED: Passes data to Analysis tab
+        self.btn_analyze = QPushButton("RUN FATIGUE ANALYSIS")
+        self.btn_analyze.clicked.connect(self.trigger_analysis)
+        self.btn_analyze.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_analyze.setStyleSheet(CSS_BTN_PRIMARY)
+        self.btn_analyze.setEnabled(False) 
         
         btn_row.addWidget(self.btn_load_ext)
-        btn_row.addWidget(self.btn_export_results)
+        btn_row.addWidget(self.btn_analyze)
         f_lay.addLayout(btn_row)
         
         dash_layout.addWidget(footer)
@@ -371,8 +381,7 @@ class VisualizerPage(QWidget):
         self.playing = True
         self.timer.start()
         
-        # Unlock the export button since data is ready!
-        self.btn_export_results.setEnabled(True)
+        self.btn_analyze.setEnabled(True)
         
         if session.frames:
             first_frame = session.frames[0]
@@ -390,22 +399,9 @@ class VisualizerPage(QWidget):
             except Exception as e: 
                 QMessageBox.critical(self, "Error", str(e))
 
-    def export_results(self):
-        """Generates the Machine Learning Ready Datasets"""
+    def trigger_analysis(self):
         if not self.active_session: return
-        
-        fn, _ = QFileDialog.getSaveFileName(self, "Save Analysis Report", "Analysis_Report", "CSV (*.csv)")
-        if fn:
-            # 1. Math engine crunches the numbers
-            ts_df, stats_df = math.generate_analysis_report(self.active_session)
-            
-            # 2. Storage engine dumps them to disk
-            success, msg = storage.export_analysis_results(ts_df, stats_df, fn)
-            
-            if success:
-                QMessageBox.information(self, "Export Success", msg)
-            else:
-                QMessageBox.critical(self, "Export Failed", msg)
+        self.parent_app.run_fatigue_analysis()
 
     def toggle_play(self):
         if not self.is_initialized: return
@@ -440,6 +436,107 @@ class VisualizerPage(QWidget):
             self.frame_idx = (self.frame_idx + 1) % len(self.active_session.frames)
 
 
+class AnalysisPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.full_df = None
+        self.summary_df = None
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        # Upper Layout for Plots
+        plot_lay = QHBoxLayout()
+        import pyqtgraph as pg
+        
+        self.fii_plot = pg.PlotWidget(title="Fatigue Instability Index (FII)")
+        self.fii_plot.setBackground(BG_PANEL)
+        self.fii_plot.showGrid(x=True, y=True, alpha=0.3)
+        self.fii_curve = self.fii_plot.plot(pen=pg.mkPen('#ff5555', width=2))
+        
+        self.maha_plot = pg.PlotWidget(title="Mahalanobis Distance (Multivariate Drift)")
+        self.maha_plot.setBackground(BG_PANEL)
+        self.maha_plot.showGrid(x=True, y=True, alpha=0.3)
+        self.maha_curve = self.maha_plot.plot(pen=pg.mkPen('#55ff55', width=2))
+        
+        plot_lay.addWidget(self.fii_plot)
+        plot_lay.addWidget(self.maha_plot)
+        layout.addLayout(plot_lay, stretch=2)
+        
+        # Lower Layout for text stats and Export
+        bot_lay = QHBoxLayout()
+        
+        self.txt_log = QTextEdit()
+        self.txt_log.setReadOnly(True)
+        self.txt_log.setStyleSheet(f"background-color: {BG_PANEL}; color: {TEXT_DIM}; border: 1px solid {BORDER}; font-family: Consolas; font-size: 13px; padding: 10px;")
+        bot_lay.addWidget(self.txt_log, stretch=1)
+        
+        btn_lay = QVBoxLayout()
+        self.btn_export = QPushButton("EXPORT FINAL REPORT")
+        self.btn_export.clicked.connect(self.export_report)
+        self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export.setStyleSheet(CSS_BTN_PRIMARY)
+        self.btn_export.setMinimumHeight(50)
+        self.btn_export.setEnabled(False)
+        
+        btn_lay.addStretch()
+        btn_lay.addWidget(self.btn_export)
+        bot_lay.addLayout(btn_lay)
+        
+        layout.addLayout(bot_lay, stretch=1)
+
+    def process_session(self, session, subj="Unknown", act="Unknown"):
+        self.txt_log.clear()
+        self.txt_log.append(f"Starting Fatigue Analysis for Subject: {subj}")
+        self.txt_log.append("Crunching full timeseries math...")
+        QApplication.processEvents()
+        
+        try:
+            # 1. Get raw mathematical output
+            ts_df, stats_df = math.generate_analysis_report(session)
+            
+            # 2. Run the medical-grade fatigue baseline algorithm
+            if FatigueAnalyzer:
+                analyzer = FatigueAnalyzer(ts_df, fps=session.fps)
+                self.full_df, self.summary_df, onset_min = analyzer.run_pipeline()
+                
+                # 3. Plot the data
+                self.fii_curve.setData(self.full_df['FII'].dropna().values)
+                self.maha_curve.setData(self.full_df['mahalanobis_dist'].dropna().values)
+                
+                # 4. Display log results
+                self.txt_log.append(f"✅ Multivariate Baseline Established (First 5 mins).")
+                self.txt_log.append(f"✅ Calculated covariance across {len(analyzer.metric_cols)} joints.")
+                
+                if onset_min:
+                    self.txt_log.append(f"\n🚨 FATIGUE ONSET DETECTED at MINUTE {onset_min} 🚨")
+                    self.txt_log.append("The subject's mechanics deviated > 2.0 Z-scores from baseline.")
+                else:
+                    self.txt_log.append("\n✅ Subject maintained stable gait through entire trial.")
+                
+                self.btn_export.setEnabled(True)
+            else:
+                self.txt_log.append("\n❌ Error: core.fatigue module not found.")
+                
+        except Exception as e:
+            self.txt_log.append(f"\n❌ Error during analysis: {str(e)}")
+            traceback.print_exc()
+
+    def export_report(self):
+        if self.summary_df is None: return
+        fn, _ = QFileDialog.getSaveFileName(self, "Save Fatigue Report", "Fatigue_Summary.csv", "CSV (*.csv)")
+        if fn:
+            try:
+                # Save both full and minute-by-minute
+                base_name = fn.replace(".csv", "")
+                self.summary_df.to_csv(f"{base_name}_Minute_Summary.csv", index=False)
+                self.full_df.to_csv(f"{base_name}_Full_Timeseries.csv", index=False)
+                QMessageBox.information(self, "Export Success", "Files successfully exported for statistical review.")
+            except Exception as e:
+                QMessageBox.critical(self, "Export Failed", str(e))
+
+
 class UnifiedWorkstation(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -468,13 +565,18 @@ class UnifiedWorkstation(QMainWindow):
         title.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: 900; font-size: 16px; margin-right: 20px; border: none;")
         nav_lay.addWidget(title)
         
+        # ADDED: 3 Navigation Buttons
         self.btn_prep = self._nav_btn("DATA STUDIO")
         self.btn_viz = self._nav_btn("VISUALIZER")
+        self.btn_analysis = self._nav_btn("ANALYSIS")
+        
         self.btn_prep.clicked.connect(lambda: self.switch_page(0))
         self.btn_viz.clicked.connect(lambda: self.switch_page(1))
+        self.btn_analysis.clicked.connect(lambda: self.switch_page(2))
         
         nav_lay.addWidget(self.btn_prep)
         nav_lay.addWidget(self.btn_viz)
+        nav_lay.addWidget(self.btn_analysis)
         nav_lay.addStretch()
         
         l_ver = QLabel(VERSION)
@@ -485,10 +587,12 @@ class UnifiedWorkstation(QMainWindow):
         
         self.stack = QStackedWidget()
         self.page_prep = DataPrepPage(self)
-        self.page_viz = VisualizerPage() 
+        self.page_viz = VisualizerPage(self) 
+        self.page_analysis = AnalysisPage()
         
         self.stack.addWidget(self.page_prep)
         self.stack.addWidget(self.page_viz)
+        self.stack.addWidget(self.page_analysis)
         main_layout.addWidget(self.stack)
         
         self.switch_page(0)
@@ -516,6 +620,23 @@ class UnifiedWorkstation(QMainWindow):
         self.stack.setCurrentIndex(index)
         self.btn_prep.setChecked(index == 0)
         self.btn_viz.setChecked(index == 1)
+        self.btn_analysis.setChecked(index == 2)
+        
+    def load_data_into_viz(self, df, subj="Unknown", act="Unknown"):
+        """Passes cleaned data from Data Studio directly to Visualizer"""
+        session = data.df_to_session(df)
+        self.page_viz.load_session(session, "Cleaned_Data_In_Memory", subj, act)
+        self.switch_page(1)
+        
+    def run_fatigue_analysis(self):
+        """Passes visualizer session directly to Analysis tab"""
+        session = self.page_viz.active_session
+        if session:
+            subj = self.page_viz.info_vals['lbl_subj'].text()
+            act = self.page_viz.info_vals['lbl_act'].text()
+            self.switch_page(2)
+            # Process slightly after switching so UI paints the switch first
+            QTimer.singleShot(50, lambda: self.page_analysis.process_session(session, subj, act))
 
     def keyPressEvent(self, event):
         if self.stack.currentIndex() == 1: 
@@ -530,8 +651,7 @@ class UnifiedWorkstation(QMainWindow):
                 self.page_viz.step(1)
         super().keyPressEvent(event)
 
-
-if __name__ == "__main__":
+if __name__ == "__main__":  
     app = QApplication(sys.argv)
     close_splash()
     w = UnifiedWorkstation()
