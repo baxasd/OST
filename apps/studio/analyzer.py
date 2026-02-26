@@ -31,8 +31,8 @@ class AnalysisPage(QWidget):
         scroll_content = QWidget()
         scroll_content.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
         self.graph_layout = QVBoxLayout(scroll_content)
-        self.graph_layout.setContentsMargins(20, 20, 20, 20)
-        self.graph_layout.setSpacing(20)
+        self.graph_layout.setContentsMargins(10, 10, 10, 10)
+        self.graph_layout.setSpacing(10)
         
         import pyqtgraph as pg
         
@@ -97,20 +97,22 @@ class AnalysisPage(QWidget):
         
         # CONTROLS
         ctrl_panel = QFrame()
-        ctrl_panel.setFixedWidth(PANEL_WIDTH + 140)
+        ctrl_panel.setFixedWidth(PANEL_WIDTH)
         ctrl_panel.setStyleSheet(CSS_SIDEBAR)
         ctrl_lay = QVBoxLayout(ctrl_panel)
         ctrl_lay.setContentsMargins(20, 20, 20, 20)
-        ctrl_lay.setSpacing(15)
+        ctrl_lay.setSpacing(10)
         
-        ctrl_lay.addWidget(QLabel("1. DATA SOURCE", styleSheet=CSS_HEADER))
+        ctrl_lay.addWidget(QLabel("DATA SOURCE", styleSheet=CSS_HEADER))
         self.btn_load = QPushButton("Load Clean Data")
         self.btn_load.clicked.connect(self.load_external_data)
         self.btn_load.setStyleSheet(CSS_BTN_OUTLINE)
         ctrl_lay.addWidget(self.btn_load)
+
+        line = QFrame(); line.setFixedHeight(1); line.setStyleSheet(f"background-color: {BORDER};")
+        ctrl_lay.addWidget(line)
         
-        ctrl_lay.addWidget(QFrame(frameShape=QFrame.Shape.HLine, styleSheet=f"color: {BORDER};"))
-        ctrl_lay.addWidget(QLabel("2. PLOT CONTROLS", styleSheet=CSS_HEADER))
+        ctrl_lay.addWidget(QLabel("PLOT CONTROLS", styleSheet=CSS_HEADER))
         
         self.cmb_grouping = QComboBox()
         self.cmb_grouping.addItems(["Frames (Raw)", "Seconds (Averaged)", "Minutes (Averaged)"])
@@ -122,8 +124,10 @@ class AnalysisPage(QWidget):
         self.chk_env.stateChanged.connect(self.recalculate_plots)
         ctrl_lay.addWidget(self.chk_env)
 
-        ctrl_lay.addWidget(QFrame(frameShape=QFrame.Shape.HLine, styleSheet=f"color: {BORDER};"))
-        ctrl_lay.addWidget(QLabel("3. ADVANCED STATISTICAL EXTRACTOR", styleSheet=CSS_HEADER))
+        line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background-color: {BORDER};")
+        
+        ctrl_lay.addWidget(line2)
+        ctrl_lay.addWidget(QLabel("CONSOLE OUTPUT", styleSheet=CSS_HEADER))
         
         self.txt_console = QTextEdit()
         self.txt_console.setReadOnly(True)
