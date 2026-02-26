@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
+import os 
 
 from core import storage, filters
 from core.config import *
@@ -17,8 +18,6 @@ class DataPrepPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        left_panel = QSplitter(Qt.Orientation.Vertical)
-        
         self.graph_container = QFrame()
         self.graph_container.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
         self.graph_layout = QVBoxLayout(self.graph_container)
@@ -28,15 +27,9 @@ class DataPrepPage(QWidget):
         self.raw_curve = None
         self.clean_curve = None
 
-        left_panel.addWidget(self.graph_container)
+        self.init_graph()
 
-        self.txt_log = QTextEdit()
-        self.txt_log.setReadOnly(True)
-        self.txt_log.setStyleSheet(f"background-color: {COLOR_CONSOLE_BG}; color: {TEXT_DIM}; border: none; border-top: 1px solid {BORDER}; border-right: 1px solid {BORDER}; font-family: Consolas; font-size: 11px; padding: 10px;")
-        
-        left_panel.addWidget(self.txt_log)
-        #left_panel.setSizes([600, 200])
-        layout.addWidget(left_panel, stretch=1)
+        layout.addWidget(self.graph_container)
 
         ctrl_panel = QFrame()
         ctrl_panel.setFixedWidth(PANEL_WIDTH)
@@ -46,7 +39,7 @@ class DataPrepPage(QWidget):
         ctrl_lay.setSpacing(15)
         ctrl_lay.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        ctrl_lay.addWidget(QLabel("1. DATA SOURCE", styleSheet=CSS_HEADER))
+        ctrl_lay.addWidget(QLabel("DATA SOURCE", styleSheet=CSS_HEADER))
         self.btn_load = QPushButton("Select File")
         self.btn_load.clicked.connect(self.load_file)
         self.btn_load.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -54,43 +47,26 @@ class DataPrepPage(QWidget):
         ctrl_lay.addWidget(self.btn_load)
         
         self.lbl_file = QLabel("No file selected")
-        self.lbl_file.setStyleSheet(f"color: {ACCENT_COLOR}; font-size: 10px; font-style: italic; border: none;")
+        self.lbl_file.setStyleSheet(f"color: {ACCENT_COLOR}; font-size: 10px; border: none;")
         ctrl_lay.addWidget(self.lbl_file)
         
         line = QFrame(); line.setFixedHeight(1); line.setStyleSheet(f"background-color: {BORDER};")
         ctrl_lay.addWidget(line)
 
-        ctrl_lay.addWidget(QLabel("2. PLOT PREVIEW", styleSheet=CSS_HEADER))
+        ctrl_lay.addWidget(QLabel("PLOT PREVIEW", styleSheet=CSS_HEADER))
         self.cmb_joint = QComboBox()
         self.cmb_joint.setStyleSheet(CSS_INPUT)
         self.cmb_joint.currentIndexChanged.connect(self.update_graph)
         ctrl_lay.addWidget(self.cmb_joint)
         
-        legend_lay = QHBoxLayout()
-        legend_lay.setContentsMargins(0, 0, 0, 0)
-        
-        def add_legend_item(text, color, dotted=False):
-            box = QLabel()
-            box.setFixedSize(14, 4)
-            if dotted: box.setStyleSheet(f"border-top: 2px dotted {color}; background: transparent;")
-            else: box.setStyleSheet(f"background-color: {color};")
-            lbl = QLabel(text)
-            lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
-            legend_lay.addWidget(box); legend_lay.addWidget(lbl)
-
-        add_legend_item("Raw", COLOR_ERROR, dotted=True)
-        legend_lay.addStretch()
-        add_legend_item("Clean", COLOR_SUCCESS)
-        ctrl_lay.addLayout(legend_lay)
-
         line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background-color: {BORDER};")
         ctrl_lay.addWidget(line2)
 
-        ctrl_lay.addWidget(QLabel("3. CLEANING PIPELINE", styleSheet=CSS_HEADER))
+        ctrl_lay.addWidget(QLabel("CLEANING PIPELINE", styleSheet=CSS_HEADER))
         
         self.chk_teleport = QCheckBox("Remove Joint Teleportation")
         self.chk_teleport.setChecked(True)
-        self.chk_teleport.setStyleSheet(f"color: {TEXT_DIM}; border: none;")
+        self.chk_teleport.setStyleSheet(f"color: {TEXT_DIM}; border:none;")
         ctrl_lay.addWidget(self.chk_teleport)
         
         tele_lay = QHBoxLayout()
@@ -101,7 +77,7 @@ class DataPrepPage(QWidget):
         tele_lay.addWidget(self.spn_tele_thresh)
         ctrl_lay.addLayout(tele_lay)
 
-        self.chk_repair = QCheckBox("Interpolate Missing/Dropped Data")
+        self.chk_repair = QCheckBox("Interpolate Missing Data")
         self.chk_repair.setChecked(True)
         self.chk_repair.setStyleSheet(f"color: {TEXT_DIM}; border: none; margin-top: 5px;")
         ctrl_lay.addWidget(self.chk_repair)
@@ -114,21 +90,26 @@ class DataPrepPage(QWidget):
         smooth_lay = QHBoxLayout()
         smooth_lay.addWidget(QLabel("Window Size:", styleSheet=f"color: {TEXT_DIM}; border: none;"))
         self.spn_win = QSpinBox()
-        self.spn_win.setRange(3, 101); self.spn_win.setValue(5); self.spn_win.setSingleStep(2)
+        self.spn_win.setRange(3, 101); self.spn_win.setValue(3); self.spn_win.setSingleStep(2)
         self.spn_win.setStyleSheet(CSS_INPUT)
         smooth_lay.addWidget(self.spn_win)
         ctrl_lay.addLayout(smooth_lay)
 
         ctrl_lay.addSpacing(15)
-        self.btn_preview = QPushButton("RUN PREVIEW")
+        self.btn_preview = QPushButton("PREVIEW")
         self.btn_preview.clicked.connect(self.run_preview)
         self.btn_preview.setStyleSheet(CSS_BTN_OUTLINE)
         self.btn_preview.setEnabled(False)
         ctrl_lay.addWidget(self.btn_preview)
+
+        self.txt_log = QTextEdit()
+        self.txt_log.setReadOnly(True)
+        self.txt_log.setStyleSheet(f"background-color: {COLOR_CONSOLE_BG}; color: {TEXT_DIM}; border: 1px solid {BORDER}; font-family: Consolas; font-size: 11px; padding: 10px;")
+        ctrl_lay.addWidget(self.txt_log)
         
         ctrl_lay.addStretch()
         
-        self.btn_export_clean = QPushButton("EXPORT CLEAN DATA")
+        self.btn_export_clean = QPushButton("EXPORT")
         self.btn_export_clean.clicked.connect(self.export_clean_data)
         self.btn_export_clean.setStyleSheet(CSS_BTN_OUTLINE)
         self.btn_export_clean.setEnabled(False)
@@ -139,6 +120,7 @@ class DataPrepPage(QWidget):
     def log(self, text): 
         self.txt_log.append(str(text))
 
+    # Draws Gridliness
     def init_graph(self):
         if self.plot_widget is None:
             import pyqtgraph as pg
@@ -157,7 +139,6 @@ class DataPrepPage(QWidget):
             self.log(f"> Loaded: {os.path.basename(fn)}")
             try:
                 self.log("...Initializing Data Engine...")
-                self.init_graph()
                 
                 df, subj, act = storage.load_session_data(fn)
                 self.raw_df = df
@@ -219,7 +200,7 @@ class DataPrepPage(QWidget):
 
     def export_clean_data(self):
         if self.clean_df is None: return
-        fn, _ = QFileDialog.getSaveFileName(self, "Export Cleaned Data", f"Cleaned_{self.current_subj}_{self.current_act}.csv", "CSV (*.csv)")
+        fn, _ = QFileDialog.getSaveFileName(self, "Export Cleaned Data", f"cleaned_{self.current_subj}_{self.current_act}.csv", "CSV (*.csv)")
         if fn:
             try:
                 storage.export_clean_csv(self.clean_df, fn) 

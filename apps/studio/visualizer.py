@@ -152,8 +152,15 @@ class VisualizerPage(QWidget):
         
         if session.frames:
             first_frame = session.frames[0]
-            hip = math.get_point(first_frame, "hip_mid")
-            if hip: self.viz.center_view(hip[0], -hip[1]) 
+            from core import math
+            hip_left = math._get_vec(first_frame, "left_hip")
+            hip_right = math._get_vec(first_frame, "right_hip")
+            
+            if hip_left is not None and hip_right is not None:
+                hip = (hip_left + hip_right) / 2
+                # Pass all 3 coordinates to the new 3D center_view
+                self.viz.center_view(hip[0], hip[1], hip[2]) 
+                
             self.viz.update_frame(first_frame)
 
     def load_external(self):

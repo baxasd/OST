@@ -80,9 +80,13 @@ CSS_MAIN_WINDOW = f"""
 CSS_SIDEBAR = f"""
     QFrame {{
         background-color: {BG_PANEL}; 
-        border: 2px solid {BORDER}; 
-        border-radius: 15px;
+        border: 1px solid {BORDER};
     }}
+"""
+
+CSS_NAVBAR = f"""
+        background-color: {BG_PANEL}; 
+        padding-bottom: 0.5px;
 """
 
 # Softened, sentence-case headers
@@ -99,7 +103,7 @@ CSS_HEADER = f"""
 CSS_INPUT = f"""
     QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {{
         background-color: #FDFDFD;
-        border: 2px solid #D1D1D1;
+        border: 1px solid {BORDER};
         border-bottom: 1px solid #8F8F8F;
         border-radius: 4px;
         padding: 5px 10px;

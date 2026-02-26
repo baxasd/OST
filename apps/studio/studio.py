@@ -7,7 +7,6 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
 
 from core.config import *
-from core import data
 
 # Import the refactored pages
 from prep import DataPrepPage
@@ -33,7 +32,7 @@ class UnifiedWorkstation(QMainWindow):
         # Build Navigation
         nav_bar = QFrame()
         nav_bar.setFixedHeight(50)
-        nav_bar.setStyleSheet(f"background-color: {BG_DARK}; border-bottom: 1px solid {BORDER}; padding-bottom: 2px;")
+        nav_bar.setStyleSheet(CSS_NAVBAR)
         nav_lay = QHBoxLayout(nav_bar)
         nav_lay.setContentsMargins(20, 0, 20, 0)
         nav_lay.setSpacing(20)
@@ -98,19 +97,6 @@ class UnifiedWorkstation(QMainWindow):
         self.btn_viz.setChecked(index == 1)
         self.btn_analysis.setChecked(index == 2)
         
-    def load_data_into_viz(self, df, subj="Unknown", act="Unknown"):
-        session = data.df_to_session(df)
-        self.page_viz.load_session(session, "Cleaned_Data_In_Memory", subj, act)
-        self.switch_page(1)
-        
-    def run_fatigue_analysis(self):
-        session = self.page_viz.active_session
-        if session:
-            subj = self.page_viz.info_vals['lbl_subj'].text()
-            act = self.page_viz.info_vals['lbl_act'].text()
-            self.switch_page(2)
-            QTimer.singleShot(50, lambda: self.page_analysis.process_session(session, subj, act))
-
     def keyPressEvent(self, event):
         if self.stack.currentIndex() == 1: 
             if event.key() == Qt.Key.Key_Space: 
