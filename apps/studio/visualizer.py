@@ -20,7 +20,6 @@ class VisualizerPage(QWidget):
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
-        
         self.loading_lbl = QLabel("Initializing Graphics Engine...")
         self.loading_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loading_lbl.setStyleSheet(f"color: {TEXT_DIM};")
@@ -46,12 +45,12 @@ class VisualizerPage(QWidget):
         dash_container.setStyleSheet(CSS_SIDEBAR)
         dash_layout = QVBoxLayout(dash_container)
         dash_layout.setContentsMargins(0, 0, 0, 0)
+        dash_layout.setSpacing(0)
         
         # Scrollable area for info & graphs
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; } "
-                             "QScrollBar { width: 8px; background: #222; }")
+        scroll.setStyleSheet(CSS_SIDEBAR + "margin: 0px; padding: 0px;")
         
         scroll_content = QWidget()
         scroll_content.setStyleSheet(f"background-color: {BG_PANEL}; border: none;")
@@ -65,6 +64,7 @@ class VisualizerPage(QWidget):
         info_lay.addWidget(QLabel("SESSION INFO", styleSheet=CSS_HEADER))
         self.info_vals = {}
         
+        # Info rows after Header
         def add_info(lbl, key):
             row = QHBoxLayout()
             l = QLabel(lbl)
@@ -81,12 +81,7 @@ class VisualizerPage(QWidget):
         add_info("Activity", "lbl_act")
         add_info("FPS", "lbl_fps")
         add_info("Frames", "lbl_frames")
-
-        self.lbl_time = QLabel("00:00")
-        self.lbl_time.setStyleSheet(f"color: {TEXT_MAIN}; font-family: Consolas; font-size: 10px; font-weight: bold; border: none;")
-        self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.info_vals['lbl_time'] = self.lbl_time
-        info_lay.addWidget(self.lbl_time)
+        add_info("Time", "lbl_time")
         
         self.grid.addWidget(self.info_box_widget, 0, 0, 1, 2)
         self.grid.addWidget(SkeletonLegend(), 1, 0, 1, 2)
@@ -105,13 +100,9 @@ class VisualizerPage(QWidget):
         dash_layout.addWidget(scroll)
         
         footer = QFrame()
-        footer.setStyleSheet(f"background-color: {BG_PANEL}; border-top: 1px solid {BORDER}; border-left: none; border-right: none; border-bottom: none;")
+        footer.setStyleSheet(CSS_SIDEBAR)
         f_lay = QVBoxLayout(footer)
         f_lay.setContentsMargins(10, 10, 10, 10)
-        
-        self.lbl_time = QLabel("00:00")
-        self.lbl_time.setStyleSheet(f"color: {TEXT_MAIN}; font-family: Consolas; font-size: 14px; font-weight: bold; border: none;")
-        self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.btn_load_ext = QPushButton("LOAD DATA")
         self.btn_load_ext.clicked.connect(self.load_external)
@@ -147,7 +138,6 @@ class VisualizerPage(QWidget):
             from core import math
             hip = math.get_point(first_frame, "hip_mid")
             if hip: 
-                # Reverted back to 2D
                 self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
 
@@ -193,6 +183,7 @@ class VisualizerPage(QWidget):
                     self.history[key].pop(0)
                 self.graphs[key].update_data(self.history[key])
         
-        self.lbl_time.setText(f"{f.timestamp:.1f}s")
+        # Updates time Label
+        self.info_vals['lbl_time'].setText(f"{f.timestamp:.1f}s")
         if update_idx: 
             self.frame_idx = (self.frame_idx + 1) % len(self.active_session.frames)

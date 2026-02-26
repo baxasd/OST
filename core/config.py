@@ -15,6 +15,7 @@ PANEL_WIDTH = 280
 BG_DARK = "#F3F3F3"        # Windows base background (Absorbs glare)
 BG_PANEL = "#FFFFFF"       # Elevated Card background (Pure White)
 BORDER = "#E5E5E5"         # Very soft, subtle divider lines
+GRID = "#605E5C" 
 
 # Typography
 TEXT_MAIN = "#1A1A1A"      # Crisp near-black for primary readability

@@ -38,19 +38,18 @@ BONES_LIST = [
 class SkeletonDisplay(pg.PlotWidget):
     def __init__(self):
         super().__init__()
+        # Draw Grid & Set Background
         self.setBackground(BG_DARK) 
         self.setAspectLocked(True)
-        self.hideAxis('left')
-        self.hideAxis('bottom')
-        
-        self.addItem(pg.GridItem(pen=pg.mkPen(BORDER, width=1)))
-        
+        self.showGrid(x=True, y=True, alpha=0.3)
+
         # Faint center axis
-        self.ref_line = pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen(BORDER, width=2))
+        self.ref_line = pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen(GRID, width=2))
         self.addItem(self.ref_line)
         
+        # Draw Skeleton
         self.bones = {}
-        self.joints = pg.ScatterPlotItem(size=12, brush=pg.mkBrush(COLOR_JOINT), pen=pg.mkPen(BG_DARK, width=1))
+        self.joints = pg.ScatterPlotItem(size=15, brush=pg.mkBrush(COLOR_JOINT), pen=pg.mkPen(BG_DARK, width=1))
         self.addItem(self.joints)
 
     def center_view(self, x, y):
@@ -76,12 +75,12 @@ class SkeletonDisplay(pg.PlotWidget):
                     c = COLOR_BONE_RIGHT
                 
                 if key not in self.bones:
-                    self.bones[key] = pg.PlotCurveItem(pen=pg.mkPen(c, width=5, cap_style=Qt.PenCapStyle.RoundCap))
+                    self.bones[key] = pg.PlotCurveItem(pen=pg.mkPen(c, width=7, cap_style=Qt.PenCapStyle.RoundCap))
                     self.addItem(self.bones[key])
                 
                 self.bones[key].setData([p1[0], p2[0]], [-p1[1], -p2[1]])
             else:
-                # FIX: If a joint drops out, clear the data so it doesn't freeze in space (spaghetti fix)
+                # FIX: If a joint drops out, clear the data
                 if key in self.bones:
                     self.bones[key].setData([], [])
 
