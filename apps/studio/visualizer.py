@@ -40,34 +40,37 @@ class VisualizerPage(QWidget):
         self.viz = SkeletonDisplay()
         self.layout.addWidget(self.viz, stretch=1)
         
+        # Panel & Controls
         dash_container = QWidget()
         dash_container.setFixedWidth(PANEL_WIDTH)
         dash_container.setStyleSheet(CSS_SIDEBAR)
         dash_layout = QVBoxLayout(dash_container)
         dash_layout.setContentsMargins(0, 0, 0, 0)
         
+        # Scrollable area for info & graphs
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; } QScrollBar { width: 8px; background: #222; }")
+        scroll.setStyleSheet("QScrollArea { border: none; } "
+                             "QScrollBar { width: 8px; background: #222; }")
         
         scroll_content = QWidget()
         scroll_content.setStyleSheet(f"background-color: {BG_PANEL}; border: none;")
         self.grid = QGridLayout(scroll_content)
-        self.grid.setContentsMargins(15, 20, 15, 20)
+        self.grid.setContentsMargins(20, 20, 20, 20)
         self.grid.setSpacing(10)
         
         self.info_box_widget = QWidget()
         info_lay = QVBoxLayout(self.info_box_widget)
-        info_lay.setContentsMargins(0, 0, 0, 10)
+        info_lay.setContentsMargins(0, 0, 0, 0)
         info_lay.addWidget(QLabel("SESSION INFO", styleSheet=CSS_HEADER))
         self.info_vals = {}
         
         def add_info(lbl, key):
             row = QHBoxLayout()
             l = QLabel(lbl)
-            l.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px; border: none; background: transparent;")
+            l.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none; background: transparent; ")
             v = QLabel("--")
-            v.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 11px; font-weight: bold; border: none; background: transparent;")
+            v.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 10px; font-weight: bold; border: none; background: transparent;")
             row.addWidget(l)
             row.addStretch()
             row.addWidget(v)
@@ -78,6 +81,12 @@ class VisualizerPage(QWidget):
         add_info("Activity", "lbl_act")
         add_info("FPS", "lbl_fps")
         add_info("Frames", "lbl_frames")
+
+        self.lbl_time = QLabel("00:00")
+        self.lbl_time.setStyleSheet(f"color: {TEXT_MAIN}; font-family: Consolas; font-size: 10px; font-weight: bold; border: none;")
+        self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.info_vals['lbl_time'] = self.lbl_time
+        info_lay.addWidget(self.lbl_time)
         
         self.grid.addWidget(self.info_box_widget, 0, 0, 1, 2)
         self.grid.addWidget(SkeletonLegend(), 1, 0, 1, 2)
@@ -103,28 +112,13 @@ class VisualizerPage(QWidget):
         self.lbl_time = QLabel("00:00")
         self.lbl_time.setStyleSheet(f"color: {TEXT_MAIN}; font-family: Consolas; font-size: 14px; font-weight: bold; border: none;")
         self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        f_lay.addWidget(self.lbl_time)
         
-        instr = QLabel("[SPACE] Play/Pause")
-        instr.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
-        instr.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        f_lay.addWidget(instr)
-        
-        btn_row = QHBoxLayout()
         self.btn_load_ext = QPushButton("LOAD DATA")
         self.btn_load_ext.clicked.connect(self.load_external)
         self.btn_load_ext.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load_ext.setStyleSheet(CSS_BTN_OUTLINE)
-        
-        self.btn_analyze = QPushButton("RUN FATIGUE ANALYSIS")
-        self.btn_analyze.clicked.connect(self.trigger_analysis)
-        self.btn_analyze.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_analyze.setStyleSheet(CSS_BTN_PRIMARY)
-        self.btn_analyze.setEnabled(False) 
-        
-        btn_row.addWidget(self.btn_load_ext)
-        btn_row.addWidget(self.btn_analyze)
-        f_lay.addLayout(btn_row)
+        self.btn_load_ext.setStyleSheet(CSS_BTN_PRIMARY)
+    
+        f_lay.addWidget(self.btn_load_ext)
         
         dash_layout.addWidget(footer)
         self.layout.addWidget(dash_container)
@@ -148,19 +142,13 @@ class VisualizerPage(QWidget):
         self.playing = True
         self.timer.start()
         
-        self.btn_analyze.setEnabled(True)
-        
         if session.frames:
             first_frame = session.frames[0]
             from core import math
-            hip_left = math._get_vec(first_frame, "left_hip")
-            hip_right = math._get_vec(first_frame, "right_hip")
-            
-            if hip_left is not None and hip_right is not None:
-                hip = (hip_left + hip_right) / 2
-                # Pass all 3 coordinates to the new 3D center_view
-                self.viz.center_view(hip[0], hip[1], hip[2]) 
-                
+            hip = math.get_point(first_frame, "hip_mid")
+            if hip: 
+                # Reverted back to 2D
+                self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
 
     def load_external(self):

@@ -93,10 +93,13 @@ CSS_NAVBAR = f"""
 CSS_HEADER = f"""
     color: {TEXT_MAIN}; 
     font-weight: 600; 
-    font-size: 13px; 
-    border: none; 
-    margin-top: 12px;
+    font-size: 12px; 
+    border: none;
+    margin-left: 0px; 
+    margin-top: 8px;
     margin-bottom: 4px;
+    padding: 0px;
+    text-align: left;
 """
 
 # Completely flattens the 3D inputs and adds the Fluent "Bottom Border" focus state

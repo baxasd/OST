@@ -36,7 +36,7 @@ class DataPrepPage(QWidget):
         ctrl_panel.setStyleSheet(CSS_SIDEBAR)
         ctrl_lay = QVBoxLayout(ctrl_panel)
         ctrl_lay.setContentsMargins(20, 20, 20, 20)
-        ctrl_lay.setSpacing(15)
+        ctrl_lay.setSpacing(10)
         ctrl_lay.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         ctrl_lay.addWidget(QLabel("DATA SOURCE", styleSheet=CSS_HEADER))
