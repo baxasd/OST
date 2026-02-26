@@ -32,14 +32,14 @@ class DataPrepPage(QWidget):
 
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
-        self.txt_log.setStyleSheet(f"background-color: #0d0d0f; color: {TEXT_DIM}; border: none; border-top: 1px solid {BORDER}; border-right: 1px solid {BORDER}; font-family: Consolas; font-size: 11px; padding: 10px;")
+        self.txt_log.setStyleSheet(f"background-color: {COLOR_CONSOLE_BG}; color: {TEXT_DIM}; border: none; border-top: 1px solid {BORDER}; border-right: 1px solid {BORDER}; font-family: Consolas; font-size: 11px; padding: 10px;")
         
         left_panel.addWidget(self.txt_log)
-        left_panel.setSizes([600, 200])
+        #left_panel.setSizes([600, 200])
         layout.addWidget(left_panel, stretch=1)
 
         ctrl_panel = QFrame()
-        ctrl_panel.setFixedWidth(PANEL_WIDTH + 40)
+        ctrl_panel.setFixedWidth(PANEL_WIDTH)
         ctrl_panel.setStyleSheet(CSS_SIDEBAR)
         ctrl_lay = QVBoxLayout(ctrl_panel)
         ctrl_lay.setContentsMargins(20, 20, 20, 20)
@@ -78,9 +78,9 @@ class DataPrepPage(QWidget):
             lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; border: none;")
             legend_lay.addWidget(box); legend_lay.addWidget(lbl)
 
-        add_legend_item("Raw", "#ff5555", dotted=True)
+        add_legend_item("Raw", COLOR_ERROR, dotted=True)
         legend_lay.addStretch()
-        add_legend_item("Clean", "#55ff55")
+        add_legend_item("Clean", COLOR_SUCCESS)
         ctrl_lay.addLayout(legend_lay)
 
         line2 = QFrame(); line2.setFixedHeight(1); line2.setStyleSheet(f"background-color: {BORDER};")
@@ -128,7 +128,6 @@ class DataPrepPage(QWidget):
         
         ctrl_lay.addStretch()
         
-        # Add this inside DataPrepPage.__init__, right after self.btn_send_viz
         self.btn_export_clean = QPushButton("EXPORT CLEAN DATA")
         self.btn_export_clean.clicked.connect(self.export_clean_data)
         self.btn_export_clean.setStyleSheet(CSS_BTN_OUTLINE)
@@ -147,8 +146,8 @@ class DataPrepPage(QWidget):
             self.plot_widget.setBackground(None)
             self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
             
-            self.raw_curve = self.plot_widget.plot(pen=pg.mkPen('#ff5555', width=1.5, style=Qt.PenStyle.DotLine))
-            self.clean_curve = self.plot_widget.plot(pen=pg.mkPen('#55ff55', width=2))
+            self.raw_curve = self.plot_widget.plot(pen=pg.mkPen(COLOR_ERROR, width=1.5, style=Qt.PenStyle.DotLine))
+            self.clean_curve = self.plot_widget.plot(pen=pg.mkPen(COLOR_SUCCESS, width=2))
             self.graph_layout.addWidget(self.plot_widget)
 
     def load_file(self):
@@ -218,13 +217,12 @@ class DataPrepPage(QWidget):
             self.raw_curve.setData(self.raw_df[joint].values)
             self.clean_curve.setData(self.clean_df[joint].values)
 
-    # Add this new method to the DataPrepPage class
     def export_clean_data(self):
         if self.clean_df is None: return
         fn, _ = QFileDialog.getSaveFileName(self, "Export Cleaned Data", f"Cleaned_{self.current_subj}_{self.current_act}.csv", "CSV (*.csv)")
         if fn:
             try:
-                storage.export_clean_csv(self.clean_df, fn) #
+                storage.export_clean_csv(self.clean_df, fn) 
                 self.log(f">> Exported clean data to {os.path.basename(fn)}")
                 QMessageBox.information(self, "Export Success", "Clean data saved successfully.")
             except Exception as e:

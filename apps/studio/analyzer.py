@@ -24,9 +24,6 @@ class AnalysisPage(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # ==========================================
-        # LEFT PANEL: GRAPH CARDS
-        # ==========================================
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; }")
@@ -42,67 +39,65 @@ class AnalysisPage(QWidget):
         # 1. Systemic Drift
         self.p_mahal = self._create_base_plot("Mahalanobis Distance")
         self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT_COLOR, width=2))
-        self.thresh_line = pg.InfiniteLine(angle=0, pen=pg.mkPen('#ff5555', width=1, style=Qt.PenStyle.DotLine))
+        self.thresh_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(COLOR_ERROR, width=1, style=Qt.PenStyle.DotLine))
         self.p_mahal.addItem(self.thresh_line)
         self.card_mahal = self._make_graph_panel(
             "Multivariate Postural Deviation", 
             "Tracks the multivariate distance of the subject's current posture compared to their baseline state"
             "Significant increases may indicate fatigue-related postural drift.", 
-            self.p_mahal, [("Drift", ACCENT_COLOR), ("Critical Threshold", "#ff5555")])
+            self.p_mahal, [("Drift", ACCENT_COLOR), ("Critical Threshold", COLOR_ERROR)])
         self.graph_layout.addWidget(self.card_mahal)
         
-        # 2. Trunk Lean (Sagittal + Frontal Envelopes)
+        # 2. Trunk Lean
         self.p_lean = self._create_base_plot("Degrees")
-        self.c_lean_z_mean = pg.PlotDataItem(pen=pg.mkPen('#5555ff', width=2))
+        self.c_lean_z_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_Z, width=2))
         self.c_lean_z_upper = pg.PlotDataItem(pen=pg.mkPen(None)); self.c_lean_z_lower = pg.PlotDataItem(pen=pg.mkPen(None))
         self.lean_z_fill = pg.FillBetweenItem(self.c_lean_z_lower, self.c_lean_z_upper, brush=(85, 85, 255, 50))
         
-        self.c_lean_x_mean = pg.PlotDataItem(pen=pg.mkPen('#ff5555', width=2))
+        self.c_lean_x_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_X, width=2))
         self.c_lean_x_upper = pg.PlotDataItem(pen=pg.mkPen(None)); self.c_lean_x_lower = pg.PlotDataItem(pen=pg.mkPen(None))
         self.lean_x_fill = pg.FillBetweenItem(self.c_lean_x_lower, self.c_lean_x_upper, brush=(255, 85, 85, 50))
 
         self.p_lean.addItem(self.c_lean_z_mean); self.p_lean.addItem(self.c_lean_z_upper); self.p_lean.addItem(self.c_lean_z_lower); self.p_lean.addItem(self.lean_z_fill)
         self.p_lean.addItem(self.c_lean_x_mean); self.p_lean.addItem(self.c_lean_x_upper); self.p_lean.addItem(self.c_lean_x_lower); self.p_lean.addItem(self.lean_x_fill)
         
-        self.card_lean = self._make_graph_panel("2. Trunk Lean Dynamics (Mean ± SD Envelope)", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Sagittal (Z)", "#5555ff"), ("Frontal (X)", "#ff5555")])
+        self.card_lean = self._make_graph_panel("2. Trunk Lean Dynamics", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Sagittal (Z)", PLOT_LEAN_Z), ("Frontal (X)", PLOT_LEAN_X)])
         self.graph_layout.addWidget(self.card_lean)
         
         # 3. Knee Flexion
         self.p_knee = self._create_base_plot("Degrees")
-        self.c_knee_l = self.p_knee.plot(pen=pg.mkPen('#55ff55', width=1.5))
-        self.c_knee_r = self.p_knee.plot(pen=pg.mkPen('#55aaff', width=1.5))
-        self.card_knee = self._make_graph_panel("3. Knee Flexion Dynamics", "Left vs Right Knee joint angles.", self.p_knee, [("Left Knee", "#55ff55"), ("Right Knee", "#55aaff")])
+        self.c_knee_l = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_L, width=1.5))
+        self.c_knee_r = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_R, width=1.5))
+        self.card_knee = self._make_graph_panel("3. Knee Flexion Dynamics", "Left vs Right Knee joint angles.", self.p_knee, [("Left Knee", PLOT_KNEE_L), ("Right Knee", PLOT_KNEE_R)])
         self.graph_layout.addWidget(self.card_knee)
 
-        # 4. Hip / Leg Swing
+        # 4. Hip
         self.p_hip = self._create_base_plot("Degrees")
-        self.c_hip_l = self.p_hip.plot(pen=pg.mkPen('#ffaa00', width=1.5))
-        self.c_hip_r = self.p_hip.plot(pen=pg.mkPen('#aa55ff', width=1.5))
-        self.card_hip = self._make_graph_panel("4. Hip Flexion (Foot/Leg Swing)", "Left vs Right Hip drive and leg swing.", self.p_hip, [("Left Hip", "#ffaa00"), ("Right Hip", "#aa55ff")])
+        self.c_hip_l = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_L, width=1.5))
+        self.c_hip_r = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_R, width=1.5))
+        self.card_hip = self._make_graph_panel("4. Hip Flexion", "Left vs Right Hip drive.", self.p_hip, [("Left Hip", PLOT_HIP_L), ("Right Hip", PLOT_HIP_R)])
         self.graph_layout.addWidget(self.card_hip)
 
-        # 5. Shoulder Dynamics
+        # 5. Shoulder
         self.p_sho = self._create_base_plot("Degrees")
-        self.c_sho_l = self.p_sho.plot(pen=pg.mkPen('#ff5555', width=1.5))
-        self.c_sho_r = self.p_sho.plot(pen=pg.mkPen('#55ffff', width=1.5))
-        self.card_sho = self._make_graph_panel("5. Shoulder Swing Dynamics", "Left vs Right Shoulder extension.", self.p_sho, [("Left Shoulder", "#ff5555"), ("Right Shoulder", "#55ffff")])
+        self.c_sho_l = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_L, width=1.5))
+        self.c_sho_r = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_R, width=1.5))
+        self.card_sho = self._make_graph_panel("5. Shoulder Swing Dynamics", "Left vs Right Shoulder extension.", self.p_sho, [("Left Shoulder", PLOT_SHO_L), ("Right Shoulder", PLOT_SHO_R)])
         self.graph_layout.addWidget(self.card_sho)
 
-        # 6. Elbow Dynamics
+        # 6. Elbow
         self.p_elb = self._create_base_plot("Degrees")
-        self.c_elb_l = self.p_elb.plot(pen=pg.mkPen('#aaffaa', width=1.5))
-        self.c_elb_r = self.p_elb.plot(pen=pg.mkPen('#ffaaaa', width=1.5))
-        self.card_elb = self._make_graph_panel("6. Elbow Flexion Dynamics", "Left vs Right Elbow tracking.", self.p_elb, [("Left Elbow", "#aaffaa"), ("Right Elbow", "#ffaaaa")])
+        self.c_elb_l = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_L, width=1.5))
+        self.c_elb_r = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_R, width=1.5))
+        self.card_elb = self._make_graph_panel("6. Elbow Flexion Dynamics", "Left vs Right Elbow tracking.", self.p_elb, [("Left Elbow", PLOT_ELB_L), ("Right Elbow", PLOT_ELB_R)])
         self.graph_layout.addWidget(self.card_elb)
 
         scroll.setWidget(scroll_content)
         main_layout.addWidget(scroll, stretch=1)
         
-        # ==========================================
-        # RIGHT PANEL: CONTROLS & CONSOLE
-        # ==========================================
+        # CONTROLS
         ctrl_panel = QFrame()
-        ctrl_panel.setFixedWidth(PANEL_WIDTH + 140) # Made wider to fit the massive text table
+        ctrl_panel.setFixedWidth(PANEL_WIDTH + 140)
         ctrl_panel.setStyleSheet(CSS_SIDEBAR)
         ctrl_lay = QVBoxLayout(ctrl_panel)
         ctrl_lay.setContentsMargins(20, 20, 20, 20)
@@ -130,11 +125,10 @@ class AnalysisPage(QWidget):
         ctrl_lay.addWidget(QFrame(frameShape=QFrame.Shape.HLine, styleSheet=f"color: {BORDER};"))
         ctrl_lay.addWidget(QLabel("3. ADVANCED STATISTICAL EXTRACTOR", styleSheet=CSS_HEADER))
         
-        # Massive Text Console
         self.txt_console = QTextEdit()
         self.txt_console.setReadOnly(True)
         self.txt_console.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-        self.txt_console.setStyleSheet(f"background-color: #0d0d0f; color: #00ffcc; font-family: Consolas; font-size: 11px; padding: 10px; border: 1px solid {BORDER}; border-radius: 4px;")
+        self.txt_console.setStyleSheet(f"background-color: {COLOR_CONSOLE_BG}; color: {COLOR_CONSOLE_TXT}; font-family: Consolas; font-size: 11px; padding: 10px; border: 1px solid {BORDER}; border-radius: 4px;")
         self.txt_console.setMinimumHeight(400)
         ctrl_lay.addWidget(self.txt_console)
         
@@ -150,10 +144,15 @@ class AnalysisPage(QWidget):
     def _create_base_plot(self, y_lbl):
         import pyqtgraph as pg
         p = pg.PlotWidget()
-        p.setBackground(BG_DARK)
-        p.setLabel('bottom', "Time")
-        p.setLabel('left', y_lbl)
-        p.showGrid(x=True, y=True, alpha=0.2)
+        p.setBackground(BG_PANEL) # Uses Pure White from config
+        p.setLabel('bottom', "Time", color=TEXT_DIM)
+        p.setLabel('left', y_lbl, color=TEXT_DIM)
+        
+        # Change grid color to a subtle grey so it shows up on white
+        p.showGrid(x=True, y=True, alpha=0.3) 
+        p.getAxis('bottom').setPen(pg.mkPen(color=TEXT_DIM))
+        p.getAxis('left').setPen(pg.mkPen(color=TEXT_DIM))
+        
         p.enableAutoRange(axis=pg.ViewBox.XYAxes)
         return p
 
@@ -189,7 +188,7 @@ class AnalysisPage(QWidget):
         fn, _ = QFileDialog.getOpenFileName(self, "Open Cleaned Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             try:
-                df, subj, act = storage.load_session_data(fn) #
+                df, subj, act = storage.load_session_data(fn)
                 session = data.df_to_session(df)
                 self.process_session(session, subj, act)
             except Exception as e:
@@ -199,7 +198,7 @@ class AnalysisPage(QWidget):
         if not FatigueAnalyzer: return
         self.active_session = session; self.subj = subj; self.act = act
         try:
-            self.ts_df, self.stats_df = math.generate_analysis_report(session) #
+            self.ts_df, self.stats_df = math.generate_analysis_report(session)
             analyzer = FatigueAnalyzer(self.ts_df, fps=session.fps)
             self.fatigue_df, _, _, self.adv_metrics = analyzer.run_pipeline()
             
@@ -210,9 +209,7 @@ class AnalysisPage(QWidget):
             import traceback; traceback.print_exc()
 
     def _update_console(self):
-        """Generates a brutally detailed text table of all stats + slope trends."""
         desc = self.adv_metrics['describe']
-        
         text = f"METRICS SUMMARY\n"
         text += f"Subj: {self.subj} | Act: {self.act}\n"
         text += "="*78 + "\n"
@@ -221,7 +218,6 @@ class AnalysisPage(QWidget):
         
         for idx, row in desc.iterrows():
             col_name = str(idx)
-            # Skip non-metrics if they snuck in
             if col_name in ['timestamp', 'frame', 'minute']: continue
             
             mean = row.get('mean', 0)
@@ -230,7 +226,6 @@ class AnalysisPage(QWidget):
             vmax = row.get('max', 0)
             med = row.get('50%', 0)
             trend = self.adv_metrics.get(f'slope_{col_name}', 0.0)
-            
             text += f"{col_name:<14} | {mean:>7.2f} | {std:>7.2f} | {vmin:>7.2f} | {vmax:>7.2f} | {med:>7.2f} | {trend:>+9.3f}\n"
             
         text += "="*78 + "\n"
@@ -241,7 +236,6 @@ class AnalysisPage(QWidget):
         
         df = self.ts_df.copy()
         df['mahalanobis_dist'] = self.fatigue_df['mahalanobis_dist']
-        
         grouping = self.cmb_grouping.currentText()
         x_label = "Frames"
         
@@ -256,14 +250,12 @@ class AnalysisPage(QWidget):
             
         x_vals = df.index.values
         
-        # 1. Mahalanobis
         self.c_mahal.setData(x_vals, df['mahalanobis_dist'].values)
         self.thresh_line.setPos(2.0)
         
         for p in [self.p_mahal, self.p_lean, self.p_knee, self.p_hip, self.p_sho, self.p_elb]: 
             p.setLabel('bottom', x_label)
 
-        # 2. Trunk Lean (Sagittal Z & Frontal X)
         roll_z_mean = df['lean_z'].rolling(max(1, len(df)//20), min_periods=1).mean().values
         roll_z_std = df['lean_z'].rolling(max(1, len(df)//20), min_periods=1).std().fillna(0).values
         roll_x_mean = df['lean_x'].rolling(max(1, len(df)//20), min_periods=1).mean().values
@@ -278,16 +270,9 @@ class AnalysisPage(QWidget):
             self.c_lean_x_mean.setData(x_vals, df['lean_x'].values); self.c_lean_x_upper.setData([], []); self.c_lean_x_lower.setData([], [])
             self.lean_z_fill.setVisible(False); self.lean_x_fill.setVisible(False)
 
-        # 3. Knee Trends
         self.c_knee_l.setData(x_vals, df['l_knee'].values); self.c_knee_r.setData(x_vals, df['r_knee'].values)
-        
-        # 4. Hip / Leg Swing
         self.c_hip_l.setData(x_vals, df['l_hip'].values); self.c_hip_r.setData(x_vals, df['r_hip'].values)
-        
-        # 5. Shoulder Dynamics
         self.c_sho_l.setData(x_vals, df['l_sho'].values); self.c_sho_r.setData(x_vals, df['r_sho'].values)
-        
-        # 6. Elbow Dynamics
         self.c_elb_l.setData(x_vals, df['l_elb'].values); self.c_elb_r.setData(x_vals, df['r_elb'].values)
 
     def export_results(self):
@@ -296,15 +281,10 @@ class AnalysisPage(QWidget):
         
         try:
             import pyqtgraph.exporters, os
-            
-            # Export Stats
             self.adv_metrics['describe'].to_csv(os.path.join(dir_path, f"{self.subj}_{self.act}_SummaryStats.csv"), index=True)
-            
-            # Export Console Text
             with open(os.path.join(dir_path, f"{self.subj}_{self.act}_AdvancedMetrics.txt"), "w") as f:
                 f.write(self.txt_console.toPlainText())
 
-            # Export Plots
             plots = [(self.p_mahal, "1_Drift"), (self.p_lean, "2_Lean"), (self.p_knee, "3_Knees"), 
                      (self.p_hip, "4_Hips"), (self.p_sho, "5_Shoulders"), (self.p_elb, "6_Elbows")]
             

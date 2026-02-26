@@ -12,10 +12,6 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFr
 from core.config import *
 
 class CaptureThread(QThread):
-    """
-    Background worker that handles the RealSense camera, MediaPipe AI, 
-    and Parquet writing to keep the main UI thread buttery smooth.
-    """
     frame_ready = pyqtSignal(QImage)
     stats_updated = pyqtSignal(float, int)
     error_occurred = pyqtSignal(str)
@@ -200,7 +196,7 @@ class RecorderApp(QMainWindow):
         side_layout.addWidget(self.lbl_frames)
 
         self.lbl_error = QLabel("")
-        self.lbl_error.setStyleSheet("color: #ff5555; font-size: 10px;")
+        self.lbl_error.setStyleSheet(f"color: {COLOR_ERROR}; font-size: 10px;")
         side_layout.addWidget(self.lbl_error)
 
         self.btn_record = QPushButton("RECORD")
@@ -259,7 +255,7 @@ class RecorderApp(QMainWindow):
         self.lbl_fps.setText(f"FPS: {fps:.1f}")
         if self.is_recording:
             self.lbl_frames.setText(f"Frames: {frame_count}")
-            self.lbl_frames.setStyleSheet("color: #ff5555; font-weight: bold;")
+            self.lbl_frames.setStyleSheet(f"color: {COLOR_ERROR}; font-weight: bold;")
 
     def handle_error(self, err_msg):
         QMessageBox.critical(self, "Hardware Error", f"The background worker crashed:\n{err_msg}")
@@ -283,7 +279,7 @@ class RecorderApp(QMainWindow):
             self._set_inputs_enabled(False)
             
             self.btn_record.setText("STOP")
-            self.btn_record.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; padding: 10px; border-radius: 4px;")
+            self.btn_record.setStyleSheet(CSS_BTN_STOP)
         else:
             self.worker.stop_recording()
             self.is_recording = False

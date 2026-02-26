@@ -5,11 +5,10 @@ from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButt
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor, QIcon, QPixmap
 
-# Ensure we can find core if running as script
 if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.config import ICON, VERSION, LOGO, BG_DARK, close_splash, ACCENT_COLOR
+from core.config import *
 
 class OSTLauncher(QMainWindow):
     def __init__(self):
@@ -36,7 +35,7 @@ class OSTLauncher(QMainWindow):
             logo_lbl.setPixmap(scaled_pix)
         else:
             logo_lbl.setText("OST")
-            logo_lbl.setStyleSheet("color: #e5e5e5; font-weight: 900; font-size: 56px;")
+            logo_lbl.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: 900; font-size: 56px;")
 
         layout.addWidget(logo_lbl)
         
@@ -56,7 +55,7 @@ class OSTLauncher(QMainWindow):
         layout.addStretch()
         
         ver = QLabel(f"{VERSION}")
-        ver.setStyleSheet("color: #444; font-size: 10px; font-family: Consolas;")
+        ver.setStyleSheet(f"color: {LAUNCHER_VER}; font-size: 10px; font-family: Consolas;")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(ver)
 
@@ -66,9 +65,9 @@ class OSTLauncher(QMainWindow):
         btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         
         btn.setStyleSheet(f"""
-            QPushButton {{ background-color: #252525; border: 1px solid #333; border-radius: 10px; text-align: left; padding-left: 20px; }}
-            QPushButton:hover {{ background-color: #2a2a2a; border: 1px solid {accent_color}; }}
-            QPushButton:pressed {{ background-color: #151515; }}
+            QPushButton {{ background-color: {LAUNCHER_BTN_BG}; border: 1px solid {BORDER}; border-radius: 10px; text-align: left; padding-left: 20px; }}
+            QPushButton:hover {{ background-color: {LAUNCHER_BTN_HOVER}; border: 1px solid {accent_color}; }}
+            QPushButton:pressed {{ background-color: {LAUNCHER_BTN_PRESS}; }}
         """)
         
         lay = QVBoxLayout(btn)
@@ -76,11 +75,11 @@ class OSTLauncher(QMainWindow):
         lay.setSpacing(4)
         
         t = QLabel(title)
-        t.setStyleSheet("color: #eee; font-weight: bold; font-size: 14px; background: transparent; border: none;")
+        t.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: bold; font-size: 14px; background: transparent; border: none;")
         t.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         
         s = QLabel(subtitle)
-        s.setStyleSheet("color: #888; font-size: 11px; background: transparent; border: none;")
+        s.setStyleSheet(f"color: {LAUNCHER_SUBTITLE}; font-size: 11px; background: transparent; border: none;")
         s.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         
         lay.addWidget(t)
