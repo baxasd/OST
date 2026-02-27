@@ -1,5 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel
 from core.config import *
+import pyqtgraph as pg
+
 
 class MetricGraph(QWidget):
     """Compact line graph for Studio Dashboard. Lazy-loads pyqtgraph."""
@@ -71,3 +73,50 @@ class SkeletonLegend(QFrame):
         add_item("Right", COLOR_BONE_RIGHT)
         add_item("Center", COLOR_BONE_CENTER)
         l.addStretch()
+
+class AnalysisCard(QFrame):
+    """Reusable card for the Analysis Page to display PyqtGraph widgets."""
+    def __init__(self, title, desc, y_label="Degrees", legend_items=None):
+        super().__init__()
+        self.setStyleSheet(f"background-color: {BG_PANEL}; border: 1px solid {BORDER}; border-radius: 6px;")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(15, 15, 15, 15)
+        
+        # Header & Legend
+        header_lay = QHBoxLayout()
+        lbl_title = QLabel(title)
+        lbl_title.setStyleSheet(f"color: {TEXT_MAIN}; font-size: 14px; font-weight: bold; border: none;")
+        header_lay.addWidget(lbl_title)
+        header_lay.addStretch()
+        
+        if legend_items:
+            leg_lay = QHBoxLayout()
+            leg_lay.setSpacing(8)
+            for name, color in legend_items:
+                indicator = QLabel()
+                indicator.setFixedSize(12, 12)
+                indicator.setStyleSheet(f"background-color: {color}; border-radius: 2px;")
+                lbl = QLabel(name)
+                lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px; border: none;")
+                leg_lay.addWidget(indicator)
+                leg_lay.addWidget(lbl)
+            header_lay.addLayout(leg_lay)
+            
+        lay.addLayout(header_lay)
+        
+        # Description
+        lbl_desc = QLabel(desc)
+        lbl_desc.setWordWrap(True)
+        lbl_desc.setStyleSheet(f"color: {TEXT_DIM}; font-size: 11px; border: none; margin-bottom: 5px;")
+        lay.addWidget(lbl_desc)
+        
+        # Plot Setup
+        self.plot = pg.PlotWidget()
+        self.plot.setBackground(BG_DARK)
+        self.plot.setLabel('bottom', "Time")
+        self.plot.setLabel('left', y_label)
+        self.plot.showGrid(x=True, y=True, alpha=0.2)
+        self.plot.enableAutoRange(axis=pg.ViewBox.XYAxes)
+        self.plot.setMinimumHeight(200)
+        
+        lay.addWidget(self.plot)

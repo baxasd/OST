@@ -17,3 +17,10 @@
 - Added metrics export in Studio
 - Minor UI fix and tweaks
 - Complete restructure of code package
+
+## 0.2.2
+
+- Code decoupled of Studio and Record applications into packages
+- Major UI fixes
+- Switched to Light Theme
+- Added Analysis Page in Studio

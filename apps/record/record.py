@@ -1,126 +1,15 @@
 import sys
 import os
-import time
 import datetime
 import mediapipe
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QImage, QPixmap, QFont, QIcon
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QFont, QIcon
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, 
                              QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox, 
                              QSizePolicy, QApplication)
 
 from core.config import *
-
-class CaptureThread(QThread):
-    """
-    Background worker that handles the RealSense camera, MediaPipe AI, 
-    and Parquet writing to keep the main UI thread buttery smooth.
-    """
-    frame_ready = pyqtSignal(QImage)
-    stats_updated = pyqtSignal(float, int)
-    error_occurred = pyqtSignal(str)
-    ready = pyqtSignal()
-
-    def __init__(self):
-        super().__init__()
-        self.running = True
-        self.recording = False
-        self.writer = None
-        self.model_complexity = 1
-        
-        self.meta = {}
-        self.subject = ""
-        self.activity = ""
-
-    def start_recording(self, subject, activity, meta):
-        self.subject = subject
-        self.activity = activity
-        self.meta = meta
-        self.recording = True
-
-    def stop_recording(self):
-        self.recording = False
-
-    def run(self):
-        try:
-            import cv2
-            from sensors.realsense import RealSenseCamera
-            from core.depth import get_mean_depth, deproject_pixel_to_point
-            from core.storage import SessionWriter
-            from core.pose import PoseEstimator
-            
-            cam = RealSenseCamera(width=640, height=480, fps=30)
-            pose = PoseEstimator(model_complexity=self.model_complexity)
-            
-            self.ready.emit()
-            
-            prev_time = time.time()
-            frame_count = 0
-
-            while self.running:
-                t = time.time()
-                dt = t - prev_time
-                fps = 1.0 / dt if dt > 0 else 0
-                prev_time = t
-
-                color_img, depth_frame = cam.get_frames()
-                
-                if color_img is None:
-                    continue
-
-                h, w, _ = color_img.shape
-                landmarks = pose.estimate(color_img)
-                
-                frame_data = {}
-                depth_intrin = None
-                
-                if self.recording and self.writer is None:
-                    self.writer = SessionWriter(self.subject, self.activity, metadata=self.meta)
-                    frame_count = 0
-
-                if self.recording and depth_frame:
-                    frame_data = {"timestamp": datetime.datetime.now().isoformat()}
-                    depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
-
-                if landmarks:
-                    for i, (lx, ly, lz) in enumerate(landmarks):
-                        cx, cy = int(lx), int(ly)
-                        if 0 <= cx < w and 0 <= cy < h:
-                            cv2.circle(color_img, (cx, cy), 3, (0, 255, 0), -1)
-                            
-                            if self.recording and depth_intrin:
-                                dist = get_mean_depth(depth_frame, cx, cy, w, h)
-                                if dist:
-                                    p = deproject_pixel_to_point(depth_intrin, cx, cy, dist)
-                                    frame_data[f"j{i}_x"] = p[0]
-                                    frame_data[f"j{i}_y"] = p[1]
-                                    frame_data[f"j{i}_z"] = p[2]
-
-                if self.recording:
-                    self.writer.write_frame(frame_data)
-                    frame_count += 1
-                    self.stats_updated.emit(fps, frame_count)
-                else:
-                    self.stats_updated.emit(fps, 0)
-                    if self.writer:
-                        self.writer.close()
-                        self.writer = None
-
-                rgb_image = cv2.cvtColor(color_img, cv2.COLOR_BGR2RGB)
-                bytes_per_line = 3 * w
-                qt_img = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-                self.frame_ready.emit(qt_img.copy())
-
-        except Exception as e:
-            self.error_occurred.emit(str(e))
-        finally:
-            if 'cam' in locals(): cam.stop()
-            if self.writer: self.writer.close()
-
-    def stop_worker(self):
-        self.running = False
-        self.wait()
-
+from backend import CaptureThread
 
 class RecorderApp(QMainWindow):
     def __init__(self):
@@ -153,15 +42,15 @@ class RecorderApp(QMainWindow):
 
         self.sidebar = QFrame()
         self.sidebar.setObjectName("Sidebar")
-        self.sidebar.setFixedWidth(220)
+        self.sidebar.setFixedWidth(PANEL_WIDTH)
         self.sidebar.setStyleSheet(CSS_SIDEBAR)
         
         side_layout = QVBoxLayout(self.sidebar)
         side_layout.setContentsMargins(15, 20, 15, 30)
         side_layout.setSpacing(5)
 
-        title = QLabel("OST Recorder")
-        title.setStyleSheet(CSS_HEADER)
+        title = QLabel("OST RECORDER")
+        title.setStyleSheet(f"color: {ACCENT_COLOR}; border: none; ")
         title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         side_layout.addWidget(title)
         side_layout.addSpacing(10)
@@ -175,11 +64,6 @@ class RecorderApp(QMainWindow):
         self.lbl_date.setStyleSheet(f"color: {TEXT_DIM};")
         side_layout.addWidget(self.lbl_date)
 
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet(f"color: {BORDER};")
-        side_layout.addWidget(line)
-
         side_layout.addWidget(QLabel("Pose Model", styleSheet=CSS_HEADER))
         self.cmb_model = QComboBox()
         self.cmb_model.addItems(["Lite", "Full", "Heavy"])
@@ -190,17 +74,15 @@ class RecorderApp(QMainWindow):
 
         side_layout.addSpacing(10)
         self.lbl_fps = QLabel("FPS: 00.0")
-        self.lbl_fps.setFont(QFont("Consolas", 12))
-        self.lbl_fps.setStyleSheet(f"color: {TEXT_MAIN};")
+        self.lbl_fps.setStyleSheet(f"color: {TEXT_MAIN}; border: none;")
         side_layout.addWidget(self.lbl_fps)
         
         self.lbl_frames = QLabel("Frames: 0")
-        self.lbl_frames.setFont(QFont("Consolas", 10))
-        self.lbl_frames.setStyleSheet(f"color: {TEXT_DIM};")
+        self.lbl_frames.setStyleSheet(f"color: {TEXT_DIM}; border: none;")
         side_layout.addWidget(self.lbl_frames)
 
         self.lbl_error = QLabel("")
-        self.lbl_error.setStyleSheet("color: #ff5555; font-size: 10px;")
+        self.lbl_error.setStyleSheet(f"color: {COLOR_ERROR}; font-size: 10px; border: none;")
         side_layout.addWidget(self.lbl_error)
 
         self.btn_record = QPushButton("RECORD")
@@ -219,13 +101,13 @@ class RecorderApp(QMainWindow):
         main_layout.addWidget(self.sidebar)
 
         self.video_container = QWidget()
-        self.video_container.setStyleSheet("background-color: black;")
+        self.video_container.setStyleSheet(f"background-color: {BG_DARK};")
         video_layout = QVBoxLayout(self.video_container)
         video_layout.setContentsMargins(0, 0, 0, 0)
         
         self.lbl_video = QLabel("Booting hardware and AI models...")
         self.lbl_video.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_video.setStyleSheet(f"color: {TEXT_DIM};")
+        self.lbl_video.setStyleSheet(f"color: {TEXT_DIM}; border: none;")
         self.lbl_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         video_layout.addWidget(self.lbl_video)
 
@@ -259,7 +141,7 @@ class RecorderApp(QMainWindow):
         self.lbl_fps.setText(f"FPS: {fps:.1f}")
         if self.is_recording:
             self.lbl_frames.setText(f"Frames: {frame_count}")
-            self.lbl_frames.setStyleSheet("color: #ff5555; font-weight: bold;")
+            self.lbl_frames.setStyleSheet(f"color: {COLOR_ERROR}; font-weight: bold;")
 
     def handle_error(self, err_msg):
         QMessageBox.critical(self, "Hardware Error", f"The background worker crashed:\n{err_msg}")
@@ -283,7 +165,7 @@ class RecorderApp(QMainWindow):
             self._set_inputs_enabled(False)
             
             self.btn_record.setText("STOP")
-            self.btn_record.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; padding: 10px; border-radius: 4px;")
+            self.btn_record.setStyleSheet(CSS_BTN_STOP)
         else:
             self.worker.stop_recording()
             self.is_recording = False

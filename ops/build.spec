@@ -22,7 +22,7 @@ mp_datas, mp_binaries, mp_hidden = collect_all('mediapipe')
 rs_datas, rs_binaries, rs_hidden = collect_all('pyrealsense2')
 cv_datas, cv_binaries, cv_hidden = collect_all('cv2')
 
-# Merge Data & Hidden Imports (Added pyarrow for Parquet support)
+# Merge Data & Hidden Imports
 final_datas = [(os.path.join(project_root, 'assets'), 'assets')] + mp_datas + rs_datas + cv_datas
 final_hidden = mp_hidden + rs_hidden + cv_hidden + ['pyarrow.vendored.version']
 
@@ -32,7 +32,7 @@ final_hidden = mp_hidden + rs_hidden + cv_hidden + ['pyarrow.vendored.version']
 rec_hidden = final_hidden + ['sensors.realsense', 'core.storage', 'core.pose', 'core.depth', 'core.config']
 
 a_rec = Analysis( #type: ignore
-    [os.path.join(project_root, 'tools', 'record.py')],
+    [os.path.join(project_root, 'apps', 'record', 'record.py')],
     pathex=[project_root],
     datas=final_datas,
     hiddenimports=rec_hidden,
@@ -45,7 +45,6 @@ a_rec = Analysis( #type: ignore
 )
 pyz_rec = PYZ(a_rec.pure, a_rec.zipped_data, cipher=block_cipher) #type: ignore
 
-# Note: Splash will only trigger if splash.png exists in your assets folder
 if os.path.exists(SPLASH_IMG):
     splash_rec = Splash(SPLASH_IMG, binaries=a_rec.binaries, datas=a_rec.datas, text_size=12, minify_script=True, always_on_top=True) #type: ignore
     rec_splash_args = [splash_rec, splash_rec.binaries]
@@ -75,7 +74,7 @@ exe_rec = EXE( #type: ignore
 stu_hidden = final_hidden + ['core.data', 'core.math', 'core.filters', 'core.widgets', 'core.render', 'core.config', 'pyqtgraph', 'pandas']
 
 a_stu = Analysis( #type: ignore
-    [os.path.join(project_root, 'tools', 'studio.py')], 
+    [os.path.join(project_root, 'apps', 'studio', 'studio.py')], 
     pathex=[project_root],
     datas=final_datas,
     hiddenimports=stu_hidden,

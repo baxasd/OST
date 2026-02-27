@@ -1,15 +1,14 @@
 import sys
 import os
 import subprocess
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QApplication, QMessageBox
+from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QApplication, QMessageBox
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor, QIcon, QPixmap
+from PyQt6.QtGui import QColor, QCursor, QIcon, QPixmap
 
-# Ensure we can find core if running as script
 if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.config import ICON, VERSION, LOGO, BG_DARK, close_splash, ACCENT_COLOR
+from core.config import *
 
 class OSTLauncher(QMainWindow):
     def __init__(self):
@@ -36,27 +35,41 @@ class OSTLauncher(QMainWindow):
             logo_lbl.setPixmap(scaled_pix)
         else:
             logo_lbl.setText("OST")
-            logo_lbl.setStyleSheet("color: #e5e5e5; font-weight: 900; font-size: 56px;")
+            logo_lbl.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: 900; font-size: 56px;")
 
         layout.addWidget(logo_lbl)
         
         sub = QLabel("OSTEO-SKELETAL TRACKER")
-        sub.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: bold; font-size: 11px; letter-spacing: 3px; margin-bottom: 20px;")
+        sub.setStyleSheet(f"color: {TEXT_MAIN}; font-weight: bold; font-size: 16px; letter-spacing: 2px; margin-bottom: 20px;")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(sub)
         
+        def add_soft_shadow(widget):
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(15)        # Softness of the shadow
+            shadow.setXOffset(0)            # Centered shadow
+            shadow.setYOffset(4)            # Pushed slightly down
+            shadow.setColor(QColor(0, 0, 0, 15)) # Very transparent black (15/255)
+            widget.setGraphicsEffect(shadow)
+
         self.btn_rec = self._make_card("NEW RECORDING", "Capture data from sensor", ACCENT_COLOR)
         self.btn_rec.clicked.connect(lambda: self._run_tool("record"))
+        self.btn_rec.setObjectName("btn_record")
+        self.btn_rec.setStyleSheet(LAUNCHER_BTN_CSS)
+        add_soft_shadow(self.btn_rec)
         layout.addWidget(self.btn_rec)
 
         self.btn_viz = self._make_card("OPEN STUDIO", "Process & Analyze data", ACCENT_COLOR)
         self.btn_viz.clicked.connect(lambda: self._run_tool("studio"))
+        self.btn_viz.setObjectName("btn_studio")
+        self.btn_viz.setStyleSheet(LAUNCHER_BTN_CSS)
+        add_soft_shadow(self.btn_viz)
         layout.addWidget(self.btn_viz)
         
         layout.addStretch()
         
         ver = QLabel(f"{VERSION}")
-        ver.setStyleSheet("color: #444; font-size: 10px; font-family: Consolas;")
+        ver.setStyleSheet(f"color: {LAUNCHER_VER}; font-size: 10px; font-family: Consolas;")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(ver)
 
@@ -66,9 +79,9 @@ class OSTLauncher(QMainWindow):
         btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         
         btn.setStyleSheet(f"""
-            QPushButton {{ background-color: #252525; border: 1px solid #333; border-radius: 10px; text-align: left; padding-left: 20px; }}
-            QPushButton:hover {{ background-color: #2a2a2a; border: 1px solid {accent_color}; }}
-            QPushButton:pressed {{ background-color: #151515; }}
+            QPushButton {{ background-color: {LAUNCHER_BTN_BG}; border: 1px solid {BORDER}; border-radius: 10px; text-align: left; padding-left: 20px; }}
+            QPushButton:hover {{ background-color: {LAUNCHER_BTN_HOVER}; border: 1px solid {accent_color}; }}
+            QPushButton:pressed {{ background-color: {LAUNCHER_BTN_PRESS}; }}
         """)
         
         lay = QVBoxLayout(btn)
@@ -76,11 +89,11 @@ class OSTLauncher(QMainWindow):
         lay.setSpacing(4)
         
         t = QLabel(title)
-        t.setStyleSheet("color: #eee; font-weight: bold; font-size: 14px; background: transparent; border: none;")
+        t.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: bold; font-size: 14px; background: transparent; border: none;")
         t.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         
         s = QLabel(subtitle)
-        s.setStyleSheet("color: #888; font-size: 11px; background: transparent; border: none;")
+        s.setStyleSheet(f"color: {LAUNCHER_SUBTITLE}; font-size: 11px; background: transparent; border: none;")
         s.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         
         lay.addWidget(t)
@@ -105,7 +118,7 @@ class OSTLauncher(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Missing component:\n{exe_path}")
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            script_path = os.path.join(base_dir, "tools", f"{tool_name}.py")
+            script_path = os.path.join(base_dir, "apps", f"{tool_name}", f"{tool_name}.py")
             env["PYTHONPATH"] = base_dir + os.pathsep + env.get("PYTHONPATH", "")
             
             if os.path.exists(script_path):

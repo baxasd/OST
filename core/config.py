@@ -8,61 +8,226 @@ WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 650
 MIN_WINDOW_WIDTH = 800
 MIN_WINDOW_HEIGHT = 550
-PANEL_WIDTH = 320
+PANEL_WIDTH = 280
+
+# UNIVERSAL UI PALETTE
+# Backgrounds
+BG_DARK = "#F3F3F3"        # Windows base background (Absorbs glare)
+BG_PANEL = "#FFFFFF"       # Elevated Card background (Pure White)
+BORDER = "#E5E5E5"         # Very soft, subtle divider lines
+GRID = "#605E5C" 
+
+# Typography
+TEXT_MAIN = "#1A1A1A"      # Crisp near-black for primary readability
+TEXT_DIM = "#605E5C"       # Soft slate for secondary text
+
+# Branding & Accents
+ACCENT_COLOR = "#005FB8"   # Classic Windows 11 Blue (High contrast)
+ACCENT_HOVER = "#004E98"   # Slightly darker blue for active states
+
+# Status & Console Colors
+COLOR_ERROR = "#C42B1C"    # Fluent UI Error Red
+COLOR_SUCCESS = "#0F7B0F"  # Fluent UI Success Green
+COLOR_CONSOLE_BG = "#FAFAFA" 
+COLOR_CONSOLE_TXT = "#1A1A1A"
+
+# Launcher Specific Colors
+LAUNCHER_BTN_BG = "#FFFFFF"
+LAUNCHER_BTN_HOVER = "#F3F3F3"
+LAUNCHER_BTN_PRESS = "#EDEBE9"
+LAUNCHER_TITLE = "#1A1A1A"
+LAUNCHER_SUBTITLE = "#605E5C"
+LAUNCHER_VER = "#A19F9D"
 
 # ================================================
-# UI PALETTE 
+# SKELETON & GRAPH PALETTE (Colorblind Safe)
 # ================================================
-ACCENT_COLOR = "#ffA826"
-ACCENT_HOVER = "#FF9800"
-BG_DARK = "#18181b"
-BG_PANEL = "#27272a"
-TEXT_MAIN = "#e4e4e7"
-TEXT_DIM = "#a1a1aa"
-BORDER = "#3f3f46"
+COLOR_BONE_LEFT = "#005FB8"   # Blue
+COLOR_BONE_RIGHT = "#D83B01"  # Rust/Orange
+COLOR_BONE_CENTER = "#8764B8" # Purple
+COLOR_JOINT = "#323130"       # Dark Gray
+
+GRAPH_LEFT = "#005FB8"
+GRAPH_RIGHT = "#D83B01"
+GRAPH_CENTER = "#8764B8"
+GRAPH_Z_AXIS = "#107C10"
+
+# Advanced Analysis Plot Colors
+PLOT_LEAN_X = "#D83B01"
+PLOT_LEAN_Z = "#005FB8"
+PLOT_KNEE_L = "#005FB8"
+PLOT_KNEE_R = "#D83B01"
+PLOT_HIP_L = "#005FB8"
+PLOT_HIP_R = "#D83B01"
+PLOT_SHO_L = "#005FB8"
+PLOT_SHO_R = "#D83B01"
+PLOT_ELB_L = "#005FB8"
+PLOT_ELB_R = "#D83B01"
 
 # ================================================
-# SKELETON & GRAPH PALETTE
+# ADVANCED CSS THEMES (The "Windows 11" Look)
 # ================================================
-COLOR_BONE_LEFT = "#9e2a2b"
-COLOR_BONE_RIGHT = "#2e86c1"
-COLOR_BONE_CENTER = "#7fb069"
-COLOR_JOINT = "#f4e9d8"
 
-GRAPH_LEFT = "#9e2a2b"
-GRAPH_RIGHT = "#2e86c1"
-GRAPH_CENTER = "#fbbf24"
-GRAPH_Z_AXIS = "#7fb069"
+# Main Window & Modern Scrollbars
+CSS_MAIN_WINDOW = f"""
+    QMainWindow {{ background-color: {BG_DARK}; }}
+    QScrollBar:vertical {{ background: transparent; width: 10px; margin: 0px; }}
+    QScrollBar::handle:vertical {{ background-color: #CCCCCC; min-height: 20px; border-radius: 5px; margin: 2px; }}
+    QScrollBar::handle:vertical:hover {{ background-color: #999999; }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+"""
+
+# Turns the sidebar into a floating white card instead of a hard column
+CSS_SIDEBAR = f"""
+    QFrame {{
+        background-color: {BG_PANEL}; 
+        border: 1px solid {BORDER};
+    }}
+"""
+
+CSS_NAVBAR = f"""
+        background-color: {BG_PANEL}; 
+        padding-bottom: 0.5px;
+"""
+
+# Softened, sentence-case headers
+CSS_HEADER = f"""
+    color: {TEXT_MAIN}; 
+    font-weight: 600; 
+    font-size: 12px; 
+    border: none;
+    margin-left: 0px; 
+    margin-top: 8px;
+    margin-bottom: 4px;
+    padding: 0px;
+    text-align: left;
+"""
+
+# Completely flattens the 3D inputs and adds the Fluent "Bottom Border" focus state
+CSS_INPUT = f"""
+    QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {{
+        background-color: #FDFDFD;
+        border: 1px solid {BORDER};
+        border-bottom: 1px solid #8F8F8F;
+        border-radius: 4px;
+        padding: 5px 10px;
+        color: {TEXT_MAIN};
+        min-height: 22px;
+    }}
+    QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover, QLineEdit:hover {{
+        background-color: #F3F3F3;
+    }}
+    QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {{
+        border-bottom: 2px;
+        background-color: #FFFFFF;
+    }}
+    QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::down-button {{
+        width: 24px; background: transparent; border: none;
+    }}
+    QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover, QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+        background-color: #EAEAEA; border-radius: 2px;
+    }}
+    QComboBox::drop-down {{
+        border: none; width: 24px;
+    }}
+"""
+
+# Add this near your other CSS strings in core/config.py
+CSS_CHECKBOX = """
+    QCheckBox {
+        color: black;
+        spacing: 8px;
+    }
+    QCheckBox::indicator {
+        width: 14px;
+        height: 14px;
+        border: 1px solid black;
+        background-color: white;
+    }
+    QCheckBox::indicator:checked {
+        background-color: #0078D4;
+        border: 1px solid #0078D4;
+    }
+"""
+
+# Modern Rounded Buttons
+CSS_BTN_PRIMARY = f"""
+    QPushButton {{ 
+        background-color: {ACCENT_COLOR}; 
+        color: #FFFFFF; 
+        font-weight: 600; 
+        font-size: 13px;
+        padding: 8px 16px; 
+        border: 1px solid {ACCENT_COLOR}; 
+        border-radius: 6px; 
+    }}
+    QPushButton:hover {{ background-color: {ACCENT_HOVER}; border-color: {ACCENT_HOVER}; }}
+    QPushButton:pressed {{ background-color: #004080; }}
+    QPushButton:disabled {{ background-color: #F3F3F3; color: #A19F9D; border: 1px solid {BORDER}; }}
+"""
+
+CSS_BTN_OUTLINE = f"""
+    QPushButton {{ 
+        background-color: {BG_PANEL}; 
+        color: {TEXT_MAIN}; 
+        font-weight: 600; 
+        font-size: 13px;
+        padding: 8px 16px; 
+        border: 1px solid #D1D1D1; 
+        border-radius: 6px; 
+    }}
+    QPushButton:hover {{ background-color: #F6F6F6; border-color: #C2C2C2; }}
+    QPushButton:pressed {{ background-color: #EAEAEA; }}
+    QPushButton:disabled {{ background-color: #FAFAFA; color: #A19F9D; border: 1px solid {BORDER}; }}
+"""
+
+CSS_BTN_STOP = f"""
+    QPushButton {{ 
+        background-color: {COLOR_ERROR}; 
+        color: white; 
+        font-weight: 600; 
+        padding: 8px 16px; 
+        border: none; 
+        border-radius: 6px; 
+    }}
+    QPushButton:hover {{ background-color: #A42618; }}
+"""
+
+LAUNCHER_BTN_CSS = """
+    QPushButton {
+        background-color: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: left; /* Keeps text aligned nicely */
+    }
+    
+    /* Hover state for NEW RECORDING (matches the Teal in your logo) */
+    QPushButton#btn_record:hover {
+        border: 1px solid #20949c; 
+        background-color: #f7fcfc;
+    }
+    
+    /* Hover state for OPEN STUDIO (matches the Blue in your text) */
+    QPushButton#btn_studio:hover {
+        border: 1px solid #005596;
+        background-color: #f5f9fc;
+    }
+
+    QPushButton:pressed {
+        background-color: #f0f0f0;
+    }
+"""
 
 # ================================================
 # APP STRINGS
 # ================================================
 APP_NAME = "OST Suite"
-VERSION = "v0.2.1"
+VERSION = "v0.2.2"
 MAX_HISTORY_LENGTH = 50
 
 # ================================================
-# UNIVERSAL CSS THEMES
-# ================================================
-CSS_MAIN_WINDOW = f"QMainWindow {{ background-color: {BG_DARK}; }}"
-CSS_SIDEBAR = f"background-color: {BG_PANEL}; border-left: 1px solid {BORDER}; border-right: 1px solid {BORDER};"
-CSS_HEADER = f"color: {TEXT_MAIN}; font-weight: bold; font-size: 11px; border: none; margin-bottom: 2px;"
-CSS_INPUT = f"background-color: #18181b; color: white; border: 1px solid {BORDER}; padding: 6px; border-radius: 4px;"
-
-CSS_BTN_PRIMARY = f"""
-    QPushButton {{ background-color: {ACCENT_COLOR}; color: {BG_DARK}; font-weight: bold; padding: 10px; border: none; border-radius: 4px; }}
-    QPushButton:hover {{ background-color: {ACCENT_HOVER}; }}
-    QPushButton:disabled {{ background-color: #3f3f46; color: #71717a; }}
-"""
-CSS_BTN_OUTLINE = f"""
-    QPushButton {{ background-color: transparent; color: {TEXT_DIM}; font-weight: bold; border: 1px solid {BORDER}; padding: 10px; border-radius: 4px; }}
-    QPushButton:hover {{ border-color: {ACCENT_COLOR}; color: {ACCENT_COLOR}; }}
-    QPushButton:disabled {{ border-color: #333; color: #555; }}
-"""
-
-# ================================================
 # METRIC GRAPH CONFIGURATIONS
-# Format: Dictionary Key, UI Title, Color, Min Range, Max Range
 # ================================================
 METRIC_CONFIGS = [
     ('lean_x', "Trunk Lat.", GRAPH_CENTER, -45, 45),
@@ -90,7 +255,7 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
 ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
 COMMAND_ICON = os.path.join(ASSETS_DIR, "command.ico")
-LOGO = os.path.join(ASSETS_DIR, "logo-main-whiteText.png")
+LOGO = os.path.join(ASSETS_DIR, "logo-main-transp.png")
 
 # ================================================
 # UTILS
