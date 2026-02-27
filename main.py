@@ -1,9 +1,9 @@
 import sys
 import os
 import subprocess
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QApplication, QMessageBox
+from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton, QApplication, QMessageBox
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor, QIcon, QPixmap
+from PyQt6.QtGui import QColor, QCursor, QIcon, QPixmap
 
 if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -40,16 +40,30 @@ class OSTLauncher(QMainWindow):
         layout.addWidget(logo_lbl)
         
         sub = QLabel("OSTEO-SKELETAL TRACKER")
-        sub.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: bold; font-size: 11px; letter-spacing: 3px; margin-bottom: 20px;")
+        sub.setStyleSheet(f"color: {TEXT_MAIN}; font-weight: bold; font-size: 16px; letter-spacing: 2px; margin-bottom: 20px;")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(sub)
         
+        def add_soft_shadow(widget):
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(15)        # Softness of the shadow
+            shadow.setXOffset(0)            # Centered shadow
+            shadow.setYOffset(4)            # Pushed slightly down
+            shadow.setColor(QColor(0, 0, 0, 15)) # Very transparent black (15/255)
+            widget.setGraphicsEffect(shadow)
+
         self.btn_rec = self._make_card("NEW RECORDING", "Capture data from sensor", ACCENT_COLOR)
         self.btn_rec.clicked.connect(lambda: self._run_tool("record"))
+        self.btn_rec.setObjectName("btn_record")
+        self.btn_rec.setStyleSheet(LAUNCHER_BTN_CSS)
+        add_soft_shadow(self.btn_rec)
         layout.addWidget(self.btn_rec)
 
         self.btn_viz = self._make_card("OPEN STUDIO", "Process & Analyze data", ACCENT_COLOR)
         self.btn_viz.clicked.connect(lambda: self._run_tool("studio"))
+        self.btn_viz.setObjectName("btn_studio")
+        self.btn_viz.setStyleSheet(LAUNCHER_BTN_CSS)
+        add_soft_shadow(self.btn_viz)
         layout.addWidget(self.btn_viz)
         
         layout.addStretch()

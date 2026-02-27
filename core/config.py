@@ -132,6 +132,24 @@ CSS_INPUT = f"""
     }}
 """
 
+# Add this near your other CSS strings in core/config.py
+CSS_CHECKBOX = """
+    QCheckBox {
+        color: black;
+        spacing: 8px;
+    }
+    QCheckBox::indicator {
+        width: 14px;
+        height: 14px;
+        border: 1px solid black;
+        background-color: white;
+    }
+    QCheckBox::indicator:checked {
+        background-color: #0078D4;
+        border: 1px solid #0078D4;
+    }
+"""
+
 # Modern Rounded Buttons
 CSS_BTN_PRIMARY = f"""
     QPushButton {{ 
@@ -174,11 +192,38 @@ CSS_BTN_STOP = f"""
     }}
     QPushButton:hover {{ background-color: #A42618; }}
 """
+
+LAUNCHER_BTN_CSS = """
+    QPushButton {
+        background-color: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: left; /* Keeps text aligned nicely */
+    }
+    
+    /* Hover state for NEW RECORDING (matches the Teal in your logo) */
+    QPushButton#btn_record:hover {
+        border: 1px solid #20949c; 
+        background-color: #f7fcfc;
+    }
+    
+    /* Hover state for OPEN STUDIO (matches the Blue in your text) */
+    QPushButton#btn_studio:hover {
+        border: 1px solid #005596;
+        background-color: #f5f9fc;
+    }
+
+    QPushButton:pressed {
+        background-color: #f0f0f0;
+    }
+"""
+
 # ================================================
 # APP STRINGS
 # ================================================
 APP_NAME = "OST Suite"
-VERSION = "v0.2.1"
+VERSION = "v0.2.2"
 MAX_HISTORY_LENGTH = 50
 
 # ================================================
@@ -210,7 +255,7 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
 ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
 COMMAND_ICON = os.path.join(ASSETS_DIR, "command.ico")
-LOGO = os.path.join(ASSETS_DIR, "logo-main-whiteText.png")
+LOGO = os.path.join(ASSETS_DIR, "logo-main-transp.png")
 
 # ================================================
 # UTILS

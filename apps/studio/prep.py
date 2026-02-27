@@ -66,7 +66,7 @@ class DataPrepPage(QWidget):
         
         self.chk_teleport = QCheckBox("Remove Joint Teleportation")
         self.chk_teleport.setChecked(True)
-        self.chk_teleport.setStyleSheet(f"color: {TEXT_DIM}; border:none;")
+        self.chk_teleport.setStyleSheet(CSS_CHECKBOX)
         ctrl_lay.addWidget(self.chk_teleport)
         
         tele_lay = QHBoxLayout()
@@ -79,12 +79,12 @@ class DataPrepPage(QWidget):
 
         self.chk_repair = QCheckBox("Interpolate Missing Data")
         self.chk_repair.setChecked(True)
-        self.chk_repair.setStyleSheet(f"color: {TEXT_DIM}; border: none; margin-top: 5px;")
+        self.chk_repair.setStyleSheet(CSS_CHECKBOX)
         ctrl_lay.addWidget(self.chk_repair)
 
         self.chk_smooth = QCheckBox("Apply Moving Average")
         self.chk_smooth.setChecked(True)
-        self.chk_smooth.setStyleSheet(f"color: {TEXT_DIM}; border: none; margin-top: 5px;")
+        self.chk_smooth.setStyleSheet(CSS_CHECKBOX)
         ctrl_lay.addWidget(self.chk_smooth)
 
         smooth_lay = QHBoxLayout()
