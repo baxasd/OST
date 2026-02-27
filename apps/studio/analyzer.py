@@ -61,7 +61,7 @@ class AnalysisPage(QWidget):
         self.p_lean.addItem(self.c_lean_z_mean); self.p_lean.addItem(self.c_lean_z_upper); self.p_lean.addItem(self.c_lean_z_lower); self.p_lean.addItem(self.lean_z_fill)
         self.p_lean.addItem(self.c_lean_x_mean); self.p_lean.addItem(self.c_lean_x_upper); self.p_lean.addItem(self.c_lean_x_lower); self.p_lean.addItem(self.lean_x_fill)
         
-        self.card_lean = self._make_graph_panel("2. Trunk Lean Dynamics", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Sagittal (Z)", PLOT_LEAN_Z), ("Frontal (X)", PLOT_LEAN_X)])
+        self.card_lean = self._make_graph_panel("Trunk Lean Dynamics", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Sagittal (Z)", PLOT_LEAN_Z), ("Frontal (X)", PLOT_LEAN_X)])
         self.graph_layout.addWidget(self.card_lean)
         
         # 3. Knee Flexion
