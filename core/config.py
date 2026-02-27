@@ -146,7 +146,7 @@ CSS_CHECKBOX = """
     }
     QCheckBox::indicator:checked {
         background-color: #0078D4;
-        border: 1px solid #0078D4;
+        border: 1px solid black;
     }
 """
 

@@ -120,7 +120,7 @@ class AnalysisPage(QWidget):
         self.cmb_grouping.currentIndexChanged.connect(self.recalculate_plots)
         ctrl_lay.addWidget(self.cmb_grouping)
         
-        self.chk_env = QCheckBox("Show Variance Envelopes (SD)"); self.chk_env.setChecked(True); self.chk_env.setStyleSheet(f"color: {TEXT_DIM};")
+        self.chk_env = QCheckBox("Show Variance Envelopes (SD)"); self.chk_env.setChecked(True); self.chk_env.setStyleSheet(CSS_CHECKBOX)
         self.chk_env.stateChanged.connect(self.recalculate_plots)
         ctrl_lay.addWidget(self.chk_env)
 
