@@ -1,7 +1,7 @@
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
-from core import math
-from core.config import *
+from core.math import kinematics
+from core.ui.theme import *
 
 # CONFIGURATION
 VISIBLE_NAMES = [
@@ -60,8 +60,8 @@ class SkeletonDisplay(pg.PlotWidget):
         
         # DRAW BONES
         for (n1, n2) in BONES_LIST:
-            p1 = math.get_point(f, n1)
-            p2 = math.get_point(f, n2)
+            p1 = kinematics.get_point(f, n1)
+            p2 = kinematics.get_point(f, n2)
             key = f"{n1}_{n2}"
             
             if p1 and p2:
@@ -87,13 +87,13 @@ class SkeletonDisplay(pg.PlotWidget):
         # DRAW JOINTS
         xs, ys = [], []
         for name in VISIBLE_NAMES:
-            p = math.get_point(f, name) 
+            p = kinematics.get_point(f, name) 
             if p:
                 xs.append(p[0])
                 ys.append(-p[1])
         self.joints.setData(xs, ys)
 
         # Update Infinite Line Position
-        hip = math.get_point(f, "hip_mid")
+        hip = kinematics.get_point(f, "hip_mid")
         if hip:
             self.ref_line.setPos(hip[0])

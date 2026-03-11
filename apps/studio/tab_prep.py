@@ -2,8 +2,10 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
 import os 
 
-from core import storage, filters
-from core.config import *
+from core.math.kinematics import filters
+from core.ui.theme import *
+from core.io import storage
+from core.ui.widgets import HeavyTaskWorker
 
 class DataPrepPage(QWidget):
     def __init__(self, parent_app):
@@ -120,7 +122,6 @@ class DataPrepPage(QWidget):
     def log(self, text): 
         self.txt_log.append(str(text))
 
-    # Draws Gridliness
     def init_graph(self):
         if self.plot_widget is None:
             import pyqtgraph as pg
@@ -128,42 +129,57 @@ class DataPrepPage(QWidget):
             self.plot_widget.setBackground(None)
             self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
             
-            self.raw_curve = self.plot_widget.plot(pen=pg.mkPen(COLOR_ERROR, width=1.5, style=Qt.PenStyle.DotLine))
-            self.clean_curve = self.plot_widget.plot(pen=pg.mkPen(COLOR_SUCCESS, width=2))
+            # OPTIMIZATION: Added autoDownsample to fix lag
+            self.raw_curve = self.plot_widget.plot(pen=pg.mkPen(COLOR_ERROR, width=1.5, style=Qt.PenStyle.DotLine), autoDownsample=True, clipToView=True)
+            self.clean_curve = self.plot_widget.plot(pen=pg.mkPen(COLOR_SUCCESS, width=2), autoDownsample=True, clipToView=True)
             self.graph_layout.addWidget(self.plot_widget)
 
     def load_file(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Open Data", "", "Data Files (*.parquet *.csv)")
         if fn:
             self.txt_log.clear()
-            self.log(f"> Loaded: {os.path.basename(fn)}")
-            try:
-                self.log("...Initializing Data Engine...")
-                
-                df, subj, act = storage.load_session_data(fn)
-                self.raw_df = df
-                self.current_subj = subj
-                self.current_act = act
-                
-                self.log(f">> Metadata Found: Subject {subj}, Activity {act}")
+            self.log(f"> Loading {os.path.basename(fn)} in background...")
+            self.btn_load.setEnabled(False)
+            self.btn_load.setText("Loading...")
+            self.btn_preview.setEnabled(False)
+            self.btn_export_clean.setEnabled(False)
+            
+            # RUN IN BACKGROUND
+            self.worker = HeavyTaskWorker(storage.load_session_data, fn)
+            self.worker.finished.connect(self._on_load_complete)
+            self.worker.error.connect(self._on_load_error)
+            self.worker.start()
 
-                self.cmb_joint.blockSignals(True)
-                self.cmb_joint.clear()
-                joint_cols = [col for col in self.raw_df.columns if col.startswith('j')]
-                self.cmb_joint.addItems(joint_cols)
-                self.cmb_joint.blockSignals(False)
+    def _on_load_complete(self, result):
+        df, subj, act = result
+        self.raw_df = df
+        self.current_subj = subj
+        self.current_act = act
+        
+        self.log(f">> Metadata Found: Subject {subj}, Activity {act}")
 
-                report, needs_repair = filters.PipelineProcessor.validate(self.raw_df)
-                self.log(report)
-                if needs_repair: 
-                    self.log(">> Auto-repair highly recommended.")
-                
-                self.lbl_file.setText(os.path.basename(fn))
-                self.btn_preview.setEnabled(True)
-                
-                self.run_preview()
-            except Exception as e: 
-                self.log(f"Error: {e}")
+        self.cmb_joint.blockSignals(True)
+        self.cmb_joint.clear()
+        joint_cols = [col for col in self.raw_df.columns if col.startswith('j')]
+        self.cmb_joint.addItems(joint_cols)
+        self.cmb_joint.blockSignals(False)
+
+        report, needs_repair = filters.PipelineProcessor.validate(self.raw_df)
+        self.log(report)
+        if needs_repair: 
+            self.log(">> Auto-repair highly recommended.")
+        
+        self.lbl_file.setText(f"{subj}_{act}")
+        self.btn_load.setEnabled(True)
+        self.btn_load.setText("Select File")
+        self.btn_preview.setEnabled(True)
+        
+        self.run_preview()
+
+    def _on_load_error(self, err_msg):
+        self.log(f"Error loading file: {err_msg}")
+        self.btn_load.setEnabled(True)
+        self.btn_load.setText("Select File")
 
     def run_preview(self):
         if self.raw_df is None: return

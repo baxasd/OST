@@ -7,9 +7,9 @@ import json
 import configparser
 import cv2
 
-from core.radar.base import parse_standard_frame
-from core.config import VERSION
-from core.storage import CameraSessionWriter, RadarSessionWriter
+from core.radar.parser import parse_standard_frame
+from core.ui.theme import VERSION
+from core.io.storage import CameraSessionWriter, RadarSessionWriter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("Publisher")
@@ -30,7 +30,7 @@ ZMQ_CAM_PORT = config['Network'].get('zmq_camera_port', '5556')
 #  Hardware Connection Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def connect_radar():
-    from sensors.radar import RadarSensor
+    from sensors.mmWave import RadarSensor
     log.info("Connecting to Texas Instruments hardware...")
     
     cli, data = None, None
@@ -102,10 +102,16 @@ def run_radar_stream(zmq_context: zmq.Context, record: bool):
 def run_camera_stream(zmq_context: zmq.Context, record: bool):
     log.info("Loading camera AI models...")
     from sensors.realsense import RealSenseCamera
-    from core.depth import get_mean_depth, deproject_pixel_to_point
-    from core.pose import PoseEstimator
+    from core.cv.depth import get_mean_depth, deproject_pixel_to_point
+    from core.cv.pose import PoseEstimator
     
-    # ONLY bind the Camera port if this function is actually called
+    # --- NEW: Read Camera settings from ini ---
+    cam_w = int(config.get('Camera', 'width', fallback=640))
+    cam_h = int(config.get('Camera', 'height', fallback=480))
+    cam_fps = int(config.get('Camera', 'fps', fallback=30))
+    model_comp = int(config.get('Camera', 'model_complexity', fallback=1))
+    jpeg_qual = int(config.get('Camera', 'jpeg_quality', fallback=80))
+    
     zmq_socket = zmq_context.socket(zmq.PUB)
     zmq_socket.bind(f"tcp://*:{ZMQ_CAM_PORT}")
 
@@ -120,8 +126,9 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
     else:
         log.info("PREVIEW MODE: Broadcasting over ZMQ only.")
 
-    cam = RealSenseCamera(width=640, height=480, fps=30)
-    pose = PoseEstimator(model_complexity=1)
+    # --- NEW: Apply settings to hardware ---
+    cam = RealSenseCamera(width=cam_w, height=cam_h, fps=cam_fps)
+    pose = PoseEstimator(model_complexity=model_comp)
 
     print("\n>>> CAMERA STREAM ACTIVE. Press Ctrl+C to stop. <<<\n")
     try:
@@ -132,7 +139,6 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
 
             h, w, _ = color_img.shape
             landmarks = pose.estimate(color_img)
-            
             frame_data = {"timestamp": time.time()}
             depth_intrin = None
 
@@ -144,7 +150,6 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
                     cx, cy = int(lx), int(ly)
                     if 0 <= cx < w and 0 <= cy < h:
                         cv2.circle(color_img, (cx, cy), 3, (0, 255, 0), -1)
-                        
                         if depth_intrin:
                             dist = get_mean_depth(depth_frame, cx, cy, w, h)
                             if dist:
@@ -153,7 +158,8 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
                                 frame_data[f"j{i}_y"] = p[1]
                                 frame_data[f"j{i}_z"] = p[2]
 
-            ret, jpeg_buffer = cv2.imencode('.jpg', color_img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            # --- NEW: Apply JPEG quality from settings ---
+            ret, jpeg_buffer = cv2.imencode('.jpg', color_img, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_qual])
             
             if ret:
                 zmq_socket.send_multipart([
@@ -168,7 +174,7 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
         log.info("Ctrl+C detected. Stopping camera stream...")
     finally:
         cam.stop()
-        zmq_socket.close() # Safely release the port
+        zmq_socket.close() 
         if writer: writer.close()
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -191,8 +197,7 @@ def main():
         print("  0. Exit")
         
         # Removed the \n inside input() to fix the space+enter glitch
-        print("Select an option (0-4):")
-        choice = input()
+        choice = input("\nSelect an option (1-4): ").strip()
         
         if choice == '1': run_radar_stream(context, record=False)
         elif choice == '2': run_radar_stream(context, record=True)

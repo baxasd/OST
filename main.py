@@ -8,13 +8,13 @@ from PyQt6.QtGui import QColor, QCursor, QIcon, QPixmap
 if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from core.config import *
+from core.ui.theme import *
 
 class OSTLauncher(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OST Suite")
-        self.setFixedSize(350, 500)
+        self.setFixedSize(350, 560) # Slightly taller to fit 3 buttons
         self.setStyleSheet(f"QMainWindow {{ background-color: {BG_DARK}; }}")
         
         if os.path.exists(ICON):
@@ -26,9 +26,9 @@ class OSTLauncher(QMainWindow):
         layout.setContentsMargins(30, 40, 30, 30)
         layout.setSpacing(15)
         
+        # --- HEADER ---
         logo_lbl = QLabel()
         logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
         if os.path.exists(LOGO):
             pix = QPixmap(LOGO)
             scaled_pix = pix.scaled(300, 150, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
@@ -36,7 +36,6 @@ class OSTLauncher(QMainWindow):
         else:
             logo_lbl.setText("OST")
             logo_lbl.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: 900; font-size: 56px;")
-
         layout.addWidget(logo_lbl)
         
         sub = QLabel("OSTEO-SKELETAL TRACKER")
@@ -44,30 +43,25 @@ class OSTLauncher(QMainWindow):
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(sub)
         
-        def add_soft_shadow(widget):
-            shadow = QGraphicsDropShadowEffect()
-            shadow.setBlurRadius(15)        # Softness of the shadow
-            shadow.setXOffset(0)            # Centered shadow
-            shadow.setYOffset(4)            # Pushed slightly down
-            shadow.setColor(QColor(0, 0, 0, 15)) # Very transparent black (15/255)
-            widget.setGraphicsEffect(shadow)
+        # --- LAUNCH BUTTONS ---
+        # 1. Stream (Headless CLI)
+        self.btn_stream = self._make_card("1. HARDWARE PUBLISHER", "Stream Radar & Camera Data", ACCENT_COLOR)
+        self.btn_stream.clicked.connect(lambda: self._run_tool("stream.py", "stream", is_cli=False))
+        layout.addWidget(self.btn_stream)
 
-        self.btn_rec = self._make_card("NEW RECORDING", "Capture data from sensor", ACCENT_COLOR)
-        self.btn_rec.clicked.connect(lambda: self._run_tool("record"))
-        self.btn_rec.setObjectName("btn_record")
-        self.btn_rec.setStyleSheet(LAUNCHER_BTN_CSS)
-        add_soft_shadow(self.btn_rec)
-        layout.addWidget(self.btn_rec)
+        # 2. Viewer (Live GUI)
+        self.btn_view = self._make_card("2. LIVE TELEMETRY", "Monitor Streams over Network", ACCENT_COLOR)
+        self.btn_view.clicked.connect(lambda: self._run_tool("view.py", "view", is_cli=False))
+        layout.addWidget(self.btn_view)
 
-        self.btn_viz = self._make_card("OPEN STUDIO", "Process & Analyze data", ACCENT_COLOR)
-        self.btn_viz.clicked.connect(lambda: self._run_tool("studio"))
-        self.btn_viz.setObjectName("btn_studio")
-        self.btn_viz.setStyleSheet(LAUNCHER_BTN_CSS)
-        add_soft_shadow(self.btn_viz)
-        layout.addWidget(self.btn_viz)
+        # 3. Studio (Post-Processing GUI)
+        self.btn_studio = self._make_card("3. OST STUDIO", "Analyze Recorded Parquet Data", ACCENT_COLOR)
+        self.btn_studio.clicked.connect(lambda: self._run_tool("studio/studio.py", "studio", is_cli=False))
+        layout.addWidget(self.btn_studio)
         
         layout.addStretch()
         
+        # --- FOOTER ---
         ver = QLabel(f"{VERSION}")
         ver.setStyleSheet(f"color: {LAUNCHER_VER}; font-size: 10px; font-family: Consolas;")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -75,7 +69,7 @@ class OSTLauncher(QMainWindow):
 
     def _make_card(self, title, subtitle, accent_color):
         btn = QPushButton()
-        btn.setFixedHeight(90)
+        btn.setFixedHeight(85)
         btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         
         btn.setStyleSheet(f"""
@@ -89,7 +83,7 @@ class OSTLauncher(QMainWindow):
         lay.setSpacing(4)
         
         t = QLabel(title)
-        t.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: bold; font-size: 14px; background: transparent; border: none;")
+        t.setStyleSheet(f"color: {LAUNCHER_TITLE}; font-weight: bold; font-size: 13px; background: transparent; border: none;")
         t.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         
         s = QLabel(subtitle)
@@ -98,34 +92,43 @@ class OSTLauncher(QMainWindow):
         
         lay.addWidget(t)
         lay.addWidget(s)
+        
+        # Apply standard soft shadow
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(4)
+        shadow.setColor(QColor(0, 0, 0, 15))
+        btn.setGraphicsEffect(shadow)
+        
         return btn
 
-    def _run_tool(self, tool_name):
+    def _run_tool(self, script_path, exe_name, is_cli=False):
         is_frozen = getattr(sys, 'frozen', False)
         env = os.environ.copy()
+        
+        # Flags for spawning a native command prompt window (Windows only)
+        creation_flags = subprocess.CREATE_NEW_CONSOLE if (is_cli and os.name == 'nt') else 0
         
         if is_frozen:
             env.pop('_MEIPASS2', None)
             env.pop('_MEIPASS', None)
-            
             base_dir = os.path.dirname(sys.executable)
-            exe_path = os.path.join(base_dir, f"{tool_name}.exe")
+            exe_path = os.path.join(base_dir, f"{exe_name}.exe")
             
             if os.path.exists(exe_path):
-                subprocess.Popen([exe_path], env=env)
-                QApplication.quit() 
+                subprocess.Popen([exe_path], env=env, creationflags=creation_flags)
             else:
                 QMessageBox.critical(self, "Error", f"Missing component:\n{exe_path}")
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            script_path = os.path.join(base_dir, "apps", f"{tool_name}", f"{tool_name}.py")
+            full_path = os.path.join(base_dir, "apps", script_path)
             env["PYTHONPATH"] = base_dir + os.pathsep + env.get("PYTHONPATH", "")
             
-            if os.path.exists(script_path):
-                subprocess.Popen([sys.executable, script_path], env=env)
-                QApplication.quit()
+            if os.path.exists(full_path):
+                subprocess.Popen([sys.executable, full_path], env=env, creationflags=creation_flags)
             else:
-                print(f"Error: Missing script at {script_path}")
+                QMessageBox.critical(self, "Error", f"Missing script at:\n{full_path}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

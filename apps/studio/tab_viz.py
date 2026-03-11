@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QTimer, Qt
 
-from core import data, storage, math
-from core.config import *
-from core.widgets import MetricGraph, SkeletonLegend
+from core.math import kinematics
+from core.ui.theme import *
+from core.io import storage, structs
+from core.ui.widgets import MetricGraph, SkeletonLegend
 
 class VisualizerPage(QWidget):
     def __init__(self, parent_app):
@@ -33,7 +34,7 @@ class VisualizerPage(QWidget):
     def init_graphics(self):
         if self.is_initialized: return
             
-        from core.render import SkeletonDisplay
+        from core.ui.render import SkeletonDisplay
         
         self.loading_lbl.setParent(None)
         self.viz = SkeletonDisplay()
@@ -135,8 +136,8 @@ class VisualizerPage(QWidget):
         
         if session.frames:
             first_frame = session.frames[0]
-            from core import math
-            hip = math.get_point(first_frame, "hip_mid")
+            from core.math import kinematics
+            hip = kinematics.get_point(first_frame, "hip_mid")
             if hip: 
                 self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
@@ -146,7 +147,7 @@ class VisualizerPage(QWidget):
         if fn:
             try:
                 df, subj, act = storage.load_session_data(fn)
-                session = data.df_to_session(df)
+                session = structs.df_to_session(df)
                 self.load_session(session, fn, subj, act)
             except Exception as e: 
                 QMessageBox.critical(self, "Error", str(e))
@@ -174,7 +175,7 @@ class VisualizerPage(QWidget):
             
         f = self.active_session.frames[self.frame_idx]
         self.viz.update_frame(f)
-        vals = math.compute_all_metrics(f)
+        vals = kinematics.compute_all_metrics(f)
 
         for key in self.keys:
             if key in vals and key in self.graphs:

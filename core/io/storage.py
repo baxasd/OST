@@ -126,6 +126,7 @@ def export_clean_csv(df: pd.DataFrame, filepath: str):
     
 def load_session_data(filepath: str):
     subj, act = "Unknown", "Unknown"
+    
     if filepath.endswith('.parquet'):
         schema = pq.read_schema(filepath)
         if schema.metadata:
@@ -133,15 +134,26 @@ def load_session_data(filepath: str):
                 subj = schema.metadata[b'subject_id'].decode()
             if b'activity' in schema.metadata:
                 act = schema.metadata[b'activity'].decode()
-        df = pd.read_parquet(filepath)
+        # OPTIMIZATION: Use PyArrow engine directly
+        df = pd.read_parquet(filepath, engine='pyarrow')
+        
     elif filepath.endswith('.csv'):
-        df = pd.read_csv(filepath)
+        try:
+            df = pd.read_csv(filepath, engine='pyarrow')
+        except:
+            df = pd.read_csv(filepath)
         clean_name = os.path.basename(filepath).replace('.csv', '')
         parts = clean_name.split('_')
         if len(parts) >= 2:
             subj, act = parts[0], parts[1]
     else:
         raise ValueError(f"Unsupported file format: {filepath}")
+
+    # OPTIMIZATION: Convert massive 64-bit floats down to 32-bit (Cuts RAM by 50%)
+    float_cols = df.select_dtypes(include=['float64']).columns
+    if len(float_cols) > 0:
+        df[float_cols] = df[float_cols].astype('float32')
+
     return df, subj, act
 
 def export_analysis_results(df_timeseries, df_stats, base_filepath):

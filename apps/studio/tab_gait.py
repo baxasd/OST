@@ -1,11 +1,13 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
 
-from core import data, storage, math
-from core.config import *
+from core.math import kinematics
+from core.ui.theme import *
+from core.io import storage, structs
+from core.ui.widgets import HeavyTaskWorker
 
 try:
-    from core.fatigue import FatigueAnalyzer
+    from core.math.fatigue import FatigueAnalyzer
 except ImportError:
     FatigueAnalyzer = None
 
@@ -36,9 +38,9 @@ class AnalysisPage(QWidget):
         
         import pyqtgraph as pg
         
-        # 1. Systemic Drift
+        # OPTIMIZATION: Added autoDownsample to ALL plots
         self.p_mahal = self._create_base_plot("Mahalanobis Distance")
-        self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT_COLOR, width=2))
+        self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT_COLOR, width=2), autoDownsample=True, clipToView=True)
         self.thresh_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(COLOR_ERROR, width=1, style=Qt.PenStyle.DotLine))
         self.p_mahal.addItem(self.thresh_line)
         self.card_mahal = self._make_graph_panel(
@@ -48,47 +50,43 @@ class AnalysisPage(QWidget):
             self.p_mahal, [("Drift", ACCENT_COLOR), ("Critical Threshold", COLOR_ERROR)])
         self.graph_layout.addWidget(self.card_mahal)
         
-        # 2. Trunk Lean
         self.p_lean = self._create_base_plot("Degrees")
-        self.c_lean_z_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_Z, width=2))
-        self.c_lean_z_upper = pg.PlotDataItem(pen=pg.mkPen(None)); self.c_lean_z_lower = pg.PlotDataItem(pen=pg.mkPen(None))
+        self.c_lean_z_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_Z, width=2), autoDownsample=True, clipToView=True)
+        self.c_lean_z_upper = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True)
+        self.c_lean_z_lower = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True)
         self.lean_z_fill = pg.FillBetweenItem(self.c_lean_z_lower, self.c_lean_z_upper, brush=(85, 85, 255, 50))
         
-        self.c_lean_x_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_X, width=2))
-        self.c_lean_x_upper = pg.PlotDataItem(pen=pg.mkPen(None)); self.c_lean_x_lower = pg.PlotDataItem(pen=pg.mkPen(None))
+        self.c_lean_x_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_X, width=2), autoDownsample=True, clipToView=True)
+        self.c_lean_x_upper = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True)
+        self.c_lean_x_lower = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True)
         self.lean_x_fill = pg.FillBetweenItem(self.c_lean_x_lower, self.c_lean_x_upper, brush=(255, 85, 85, 50))
 
         self.p_lean.addItem(self.c_lean_z_mean); self.p_lean.addItem(self.c_lean_z_upper); self.p_lean.addItem(self.c_lean_z_lower); self.p_lean.addItem(self.lean_z_fill)
         self.p_lean.addItem(self.c_lean_x_mean); self.p_lean.addItem(self.c_lean_x_upper); self.p_lean.addItem(self.c_lean_x_lower); self.p_lean.addItem(self.lean_x_fill)
-        
         self.card_lean = self._make_graph_panel("Trunk Lean Dynamics", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Sagittal (Z)", PLOT_LEAN_Z), ("Frontal (X)", PLOT_LEAN_X)])
         self.graph_layout.addWidget(self.card_lean)
         
-        # 3. Knee Flexion
         self.p_knee = self._create_base_plot("Degrees")
-        self.c_knee_l = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_L, width=1.5))
-        self.c_knee_r = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_R, width=1.5))
+        self.c_knee_l = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_L, width=1.5), autoDownsample=True, clipToView=True)
+        self.c_knee_r = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_R, width=1.5), autoDownsample=True, clipToView=True)
         self.card_knee = self._make_graph_panel("3. Knee Flexion Dynamics", "Left vs Right Knee joint angles.", self.p_knee, [("Left Knee", PLOT_KNEE_L), ("Right Knee", PLOT_KNEE_R)])
         self.graph_layout.addWidget(self.card_knee)
 
-        # 4. Hip
         self.p_hip = self._create_base_plot("Degrees")
-        self.c_hip_l = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_L, width=1.5))
-        self.c_hip_r = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_R, width=1.5))
+        self.c_hip_l = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_L, width=1.5), autoDownsample=True, clipToView=True)
+        self.c_hip_r = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_R, width=1.5), autoDownsample=True, clipToView=True)
         self.card_hip = self._make_graph_panel("4. Hip Flexion", "Left vs Right Hip drive.", self.p_hip, [("Left Hip", PLOT_HIP_L), ("Right Hip", PLOT_HIP_R)])
         self.graph_layout.addWidget(self.card_hip)
 
-        # 5. Shoulder
         self.p_sho = self._create_base_plot("Degrees")
-        self.c_sho_l = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_L, width=1.5))
-        self.c_sho_r = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_R, width=1.5))
+        self.c_sho_l = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_L, width=1.5), autoDownsample=True, clipToView=True)
+        self.c_sho_r = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_R, width=1.5), autoDownsample=True, clipToView=True)
         self.card_sho = self._make_graph_panel("5. Shoulder Swing Dynamics", "Left vs Right Shoulder extension.", self.p_sho, [("Left Shoulder", PLOT_SHO_L), ("Right Shoulder", PLOT_SHO_R)])
         self.graph_layout.addWidget(self.card_sho)
 
-        # 6. Elbow
         self.p_elb = self._create_base_plot("Degrees")
-        self.c_elb_l = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_L, width=1.5))
-        self.c_elb_r = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_R, width=1.5))
+        self.c_elb_l = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_L, width=1.5), autoDownsample=True, clipToView=True)
+        self.c_elb_r = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_R, width=1.5), autoDownsample=True, clipToView=True)
         self.card_elb = self._make_graph_panel("6. Elbow Flexion Dynamics", "Left vs Right Elbow tracking.", self.p_elb, [("Left Elbow", PLOT_ELB_L), ("Right Elbow", PLOT_ELB_R)])
         self.graph_layout.addWidget(self.card_elb)
 
@@ -148,15 +146,12 @@ class AnalysisPage(QWidget):
     def _create_base_plot(self, y_lbl):
         import pyqtgraph as pg
         p = pg.PlotWidget()
-        p.setBackground(BG_PANEL) # Uses Pure White from config
+        p.setBackground(BG_PANEL) 
         p.setLabel('bottom', "Time", color=TEXT_DIM)
         p.setLabel('left', y_lbl, color=TEXT_DIM)
-        
-        # Change grid color to a subtle grey so it shows up on white
         p.showGrid(x=True, y=True, alpha=0.3) 
         p.getAxis('bottom').setPen(pg.mkPen(color=TEXT_DIM))
         p.getAxis('left').setPen(pg.mkPen(color=TEXT_DIM))
-        
         p.enableAutoRange(axis=pg.ViewBox.XYAxes)
         return p
 
@@ -193,7 +188,7 @@ class AnalysisPage(QWidget):
         if fn:
             try:
                 df, subj, act = storage.load_session_data(fn)
-                session = data.df_to_session(df)
+                session = structs.df_to_session(df)
                 self.process_session(session, subj, act)
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load data:\n{str(e)}")
@@ -201,16 +196,43 @@ class AnalysisPage(QWidget):
     def process_session(self, session, subj, act):
         if not FatigueAnalyzer: return
         self.active_session = session; self.subj = subj; self.act = act
-        try:
-            self.ts_df, self.stats_df = math.generate_analysis_report(session)
-            analyzer = FatigueAnalyzer(self.ts_df, fps=session.fps)
-            self.fatigue_df, _, _, self.adv_metrics = analyzer.run_pipeline()
+        
+        self.txt_console.setText("Running heavy fatigue analysis in background...\nPlease wait.")
+        self.btn_load.setEnabled(False)
+        self.btn_load.setText("Processing...")
+        
+        # RUN IN BACKGROUND
+        self.worker = HeavyTaskWorker(self._run_math_pipeline, session)
+        self.worker.finished.connect(self._on_pipeline_complete)
+        self.worker.error.connect(self._on_pipeline_error)
+        self.worker.start()
+
+    def _run_math_pipeline(self, session):
+        ts_df, stats_df = kinematics.generate_analysis_report(session)
+        
+        # OPTIMIZATION: Decimate Data (Take every 3rd frame)
+        if len(ts_df) > 5000:
+            ts_df = ts_df.iloc[::3, :].copy() 
+            fps = session.fps / 3.0
+        else:
+            fps = session.fps
             
-            self._update_console()
-            self.recalculate_plots()
-            self.btn_export.setEnabled(True)
-        except Exception as e:
-            import traceback; traceback.print_exc()
+        analyzer = FatigueAnalyzer(ts_df, fps=fps)
+        fatigue_df, _, _, adv_metrics = analyzer.run_pipeline()
+        return ts_df, stats_df, fatigue_df, adv_metrics
+
+    def _on_pipeline_complete(self, result):
+        self.ts_df, self.stats_df, self.fatigue_df, self.adv_metrics = result
+        self._update_console()
+        self.recalculate_plots()
+        self.btn_export.setEnabled(True)
+        self.btn_load.setEnabled(True)
+        self.btn_load.setText("Load Clean Data")
+
+    def _on_pipeline_error(self, err):
+        self.txt_console.setText(f"Error during analysis:\n{err}")
+        self.btn_load.setEnabled(True)
+        self.btn_load.setText("Load Clean Data")
 
     def _update_console(self):
         desc = self.adv_metrics['describe']

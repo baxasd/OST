@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import pandas as pd
-from core.data import Frame, NAME_TO_ID
+from core.io.structs import Frame, NAME_TO_ID
 
 def _get_vec(frame, name_or_id):
     """Internal helper to get numpy vector from frame."""

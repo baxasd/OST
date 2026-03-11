@@ -1,7 +1,28 @@
 from PyQt6.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel
-from core.config import *
+from PyQt6.QtCore import QThread, pyqtSignal
+from core.ui.theme import *
 import pyqtgraph as pg
 
+
+class HeavyTaskWorker(QThread):
+    """Runs heavy data/math tasks in the background without freezing the UI."""
+    finished = pyqtSignal(object)  
+    error = pyqtSignal(str)        
+
+    def __init__(self, task_function, *args, **kwargs):
+        super().__init__()
+        self.task_function = task_function
+        self.args = args
+        self.kwargs = kwargs
+
+    def run(self):
+        try:
+            result = self.task_function(*self.args, **self.kwargs)
+            self.finished.emit(result)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.error.emit(str(e))
 
 class MetricGraph(QWidget):
     """Compact line graph for Studio Dashboard. Lazy-loads pyqtgraph."""

@@ -12,9 +12,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont
 
-from core.radar.base import RadarConfig
-from core.config import *
-from core.radar.radar_math import RecordingSession, extract_gait_metrics
+from core.radar.parser import RadarConfig
+from core.ui.theme import *
+from core.radar.dsp import RecordingSession, extract_gait_metrics
+from core.ui.widgets import HeavyTaskWorker
 
 log = logging.getLogger("RadarAnalyzer")
 
@@ -250,29 +251,59 @@ class RadarAnalysisPage(QWidget):
         path, _ = QFileDialog.getOpenFileName(self, "Open Parquet", "records", "Parquet files (*.parquet)")
         if not path: return
         
-        try:
-            self.session = RecordingSession(path, self.radar_cfg)
-            self.lbl_file.setText(Path(path).name)
-            s = self.session
-            fps = s.num_frames / s.duration_s if s.duration_s > 0 else 0
-            
-            self.lbl_summary.setText(
-                f"<b>Duration:</b> {s.duration_s:.1f} s ({s.num_frames} frames)<br>"
-                f"<b>Sampling:</b> {fps:.1f} Hz<br>"
-                f"<b>Resolution:</b> {self.radar_cfg.dopRes:.3f} m/s"
-            )
-            self.btn_apply.setEnabled(True)
-            self._recompute()
-        except Exception as e:
-            log.error(e)
+        self.lbl_file.setText(Path(path).name)
+        self.lbl_summary.setText("Loading huge binary file...\nPlease wait.")
+        self.btn_open.setEnabled(False)
+        
+        # RUN IN BACKGROUND
+        self.load_worker = HeavyTaskWorker(RecordingSession, path, self.radar_cfg)
+        self.load_worker.finished.connect(self._on_load_complete)
+        self.load_worker.error.connect(self._on_load_error)
+        self.load_worker.start()
+
+    def _on_load_complete(self, session):
+        self.session = session
+        fps = session.num_frames / session.duration_s if session.duration_s > 0 else 0
+        
+        self.lbl_summary.setText(
+            f"<b>Duration:</b> {session.duration_s:.1f} s ({session.num_frames} frames)<br>"
+            f"<b>Sampling:</b> {fps:.1f} Hz<br>"
+            f"<b>Resolution:</b> {self.radar_cfg.dopRes:.3f} m/s"
+        )
+        self.btn_open.setEnabled(True)
+        self.btn_apply.setEnabled(True)
+        self._recompute()
+
+    def _on_load_error(self, err):
+        log.error(err)
+        self.lbl_summary.setText(f"Error: {err}")
+        self.btn_open.setEnabled(True)
 
     def _recompute(self):
         if not self.session: return
-        self._spec, self._t_axis, self._v_axis, self._centroid = self.session.build_spectrogram(
+        self.btn_apply.setEnabled(False)
+        self.btn_apply.setText("Computing FFTs...")
+        
+        # RUN IN BACKGROUND
+        self.calc_worker = HeavyTaskWorker(
+            self.session.build_spectrogram, 
             self.spn_lo.value(), self.spn_hi.value(), int(self.spn_smooth.value())
         )
+        self.calc_worker.finished.connect(self._on_recompute_complete)
+        self.calc_worker.error.connect(self._on_recompute_error)
+        self.calc_worker.start()
+
+    def _on_recompute_complete(self, result):
+        self._spec, self._t_axis, self._v_axis, self._centroid = result
         self._render()
         self._update_stats()
+        self.btn_apply.setEnabled(True)
+        self.btn_apply.setText("Apply Filter")
+
+    def _on_recompute_error(self, err):
+        log.error(err)
+        self.btn_apply.setEnabled(True)
+        self.btn_apply.setText("Apply Filter")
 
     def _render(self):
         if self._spec is None: return
@@ -322,7 +353,6 @@ class RadarAnalysisPage(QWidget):
     def _update_stats(self):
         if self._spec is None: return
         
-        # ── Call the decoupled math engine ──
         peak_v, mean_abs, spm = extract_gait_metrics(self._spec, self._t_axis, self._v_axis)
 
         cadence_str = "--"

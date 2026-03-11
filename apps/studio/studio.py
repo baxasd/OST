@@ -6,13 +6,13 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHB
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QIcon
 
-from core.config import *
+from core.ui.theme import *
 
 # Import the refactored pages
-from prep import DataPrepPage
-from visualizer import VisualizerPage
-from analyzer import AnalysisPage
-from radar_analyzer import RadarAnalysisPage # <-- NEW: Import the radar module
+from tab_prep import DataPrepPage
+from tab_viz import VisualizerPage
+from tab_gait import AnalysisPage
+from tab_radar import RadarAnalysisPage # <-- NEW: Import the radar module
 
 class UnifiedWorkstation(QMainWindow):
     def __init__(self):

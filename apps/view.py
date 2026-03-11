@@ -10,11 +10,12 @@ import configparser
 
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
-                             QVBoxLayout, QLabel, QStackedWidget, QSplitter)
+                             QVBoxLayout, QLabel, QStackedWidget)
 from PyQt6.QtGui import QFont, QPixmap
 
-from core.radar.base import RadarConfig
-from core.config import * 
+# --- NEW: Refactored Imports ---
+from core.radar.parser import RadarConfig
+from core.ui.theme import * 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("Subscriber")
 
@@ -82,7 +83,7 @@ class ZmqRadarWorker(QThread):
 
 
 class ZmqCameraWorker(QThread):
-    new_frame = pyqtSignal(dict, bytes) # Emit JSON metadata AND Image Bytes
+    new_frame = pyqtSignal(dict, bytes)
     error     = pyqtSignal(str)
 
     def __init__(self, publisher_ip: str):
@@ -98,7 +99,6 @@ class ZmqCameraWorker(QThread):
             try:
                 try:
                     msg_parts = self.socket.recv_multipart(flags=zmq.NOBLOCK)
-                    # Unpack the multipart payload
                     if len(msg_parts) == 2:
                         meta_dict = json.loads(msg_parts[0].decode('utf-8'))
                         img_bytes = msg_parts[1]
@@ -141,8 +141,7 @@ class LiveViewerWindow(QMainWindow):
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(20, 20, 20, 20)
-
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_layout.setSpacing(20) # Clean gap between the two windows
         
         # ── 1. Radar Stack ──
         self.radar_stack = QStackedWidget()
@@ -169,7 +168,9 @@ class LiveViewerWindow(QMainWindow):
 
         self.radar_stack.addWidget(self.lbl_wait_radar)
         self.radar_stack.addWidget(self.plot_radar)
-        splitter.addWidget(self.radar_stack)
+        
+        # Lock radar to 50% width
+        main_layout.addWidget(self.radar_stack, stretch=1)
 
         # ── 2. Camera Stack ──
         self.cam_stack = QStackedWidget()
@@ -179,16 +180,15 @@ class LiveViewerWindow(QMainWindow):
         self.lbl_wait_cam.setFont(QFont("Segoe UI", 12))
         self.lbl_wait_cam.setStyleSheet(f"color: {TEXT_DIM}; background-color: {BG_PANEL}; border-radius: 8px;")
         
-        # Native Video rendering frame
         self.lbl_cam_feed = QLabel()
         self.lbl_cam_feed.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_cam_feed.setStyleSheet(f"background-color: {BG_PANEL}; border-radius: 8px;")
         
         self.cam_stack.addWidget(self.lbl_wait_cam)
         self.cam_stack.addWidget(self.lbl_cam_feed)
-        splitter.addWidget(self.cam_stack)
-
-        main_layout.addWidget(splitter)
+        
+        # Lock camera to 50% width
+        main_layout.addWidget(self.cam_stack, stretch=1)
 
     def _precompute_zoom(self):
         src_rows = min(int(MAX_RANGE / self.cfg.rangeRes), self.cfg.numRangeBins)
@@ -222,11 +222,9 @@ class LiveViewerWindow(QMainWindow):
             self.cam_stack.setCurrentIndex(1)
             self.cam_active = True
 
-        # Decode the JPEG bytes perfectly back into an image
         pixmap = QPixmap()
         pixmap.loadFromData(img_bytes)
         
-        # Scale to fit the dynamic UI window size while preserving 4:3 ratio
         lbl_w = self.lbl_cam_feed.width()
         lbl_h = self.lbl_cam_feed.height()
         if lbl_w > 0 and lbl_h > 0:
@@ -252,7 +250,8 @@ def main():
         print("  2. Connect to External IP")
         print("  3. Exit")
         
-        choice = input("\nSelect an option (1-3): ").strip()
+        print("\nSelect an option (1-3): ", end="", flush=True)
+        choice = input().strip()
         
         if choice in ['1', '2']:
             ip = VIEW_IP if choice == '1' else input("Enter Publisher IP: ").strip()
