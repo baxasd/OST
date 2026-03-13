@@ -14,3 +14,9 @@ pyarrow
 
 # Build System
 pyinstaller
+
+# Networking
+zmq
+
+# Serial Communication
+pyserial
