@@ -8,7 +8,7 @@ if not getattr(sys, 'frozen', False):
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import (QGraphicsDropShadowEffect, QMainWindow, QWidget, 
-                             QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
+                             QVBoxLayout, QLabel, QPushButton, 
                              QApplication, QMessageBox)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QCursor, QIcon, QPixmap
@@ -24,10 +24,10 @@ class OSTLauncher(QMainWindow):
         super().__init__()
         self.setWindowTitle("OST Suite")
         self.setFixedSize(350, 560) 
-        self.setStyleSheet(f"QMainWindow {{ background-color: {BG_DARK}; }}")
+        self.setStyleSheet(f"QMainWindow {{ background-color: {BG_MAIN}; }}")
         
-        if os.path.exists(ICON):
-            self.setWindowIcon(QIcon(ICON))
+        if os.path.exists(MAIN_ICON):
+            self.setWindowIcon(QIcon(MAIN_ICON))
         
         central = QWidget()
         self.setCentralWidget(central)
@@ -56,17 +56,17 @@ class OSTLauncher(QMainWindow):
         # ── LAUNCH BUTTONS ──
         
         # 1. Stream (CRITICAL FIX: is_cli=True so the terminal window actually appears)
-        self.btn_stream = self._make_card("1. HARDWARE PUBLISHER", "Stream Radar & Camera Data", ACCENT_COLOR)
+        self.btn_stream = self._make_card("1. HARDWARE PUBLISHER", "Stream Radar & Camera Data", ACCENT)
         self.btn_stream.clicked.connect(lambda: self._run_tool("stream.py", "stream", is_cli=True))
         layout.addWidget(self.btn_stream)
 
         # 2. Viewer (Live GUI)
-        self.btn_view = self._make_card("2. LIVE TELEMETRY", "Monitor Streams over Network", ACCENT_COLOR)
+        self.btn_view = self._make_card("2. LIVE TELEMETRY", "Monitor Streams over Network", ACCENT)
         self.btn_view.clicked.connect(lambda: self._run_tool("view.py", "view", is_cli=False))
         layout.addWidget(self.btn_view)
 
         # 3. Studio (Post-Processing GUI)
-        self.btn_studio = self._make_card("3. OST STUDIO", "Analyze Recorded Parquet Data", ACCENT_COLOR)
+        self.btn_studio = self._make_card("3. OST STUDIO", "Analyze Recorded Parquet Data", ACCENT)
         self.btn_studio.clicked.connect(lambda: self._run_tool("studio.py", "studio", is_cli=False))
         layout.addWidget(self.btn_studio)
         

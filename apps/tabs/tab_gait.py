@@ -43,14 +43,14 @@ class AnalysisPage(QWidget):
         scroll.setStyleSheet("QScrollArea { border: none; }")
         
         scroll_content = QWidget()
-        scroll_content.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
+        scroll_content.setStyleSheet(f"background-color: {BG_MAIN}; border: none;")
         self.graph_layout = QVBoxLayout(scroll_content)
         self.graph_layout.setContentsMargins(10, 10, 10, 10)
         self.graph_layout.setSpacing(10)
         
         # ── Graph 1: Systemic Drift (Mahalanobis) ──
         self.p_mahal = self._create_base_plot("Mahalanobis Distance")
-        self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT_COLOR, width=2), autoDownsample=True, clipToView=True)
+        self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT, width=2), autoDownsample=True, clipToView=True)
         
         # Adds a red dotted line to show the critical failure threshold
         self.thresh_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(COLOR_ERROR, width=1, style=Qt.PenStyle.DotLine))
@@ -59,7 +59,7 @@ class AnalysisPage(QWidget):
             "Multivariate Postural Deviation", 
             "Tracks the multivariate distance of the subject's current posture compared to their baseline state. "
             "Significant increases may indicate fatigue-related postural drift.", 
-            self.p_mahal, [("Drift", ACCENT_COLOR), ("Critical Threshold", COLOR_ERROR)]
+            self.p_mahal, [("Drift", ACCENT), ("Critical Threshold", COLOR_ERROR)]
         )
         self.graph_layout.addWidget(self.card_mahal)
         

@@ -32,7 +32,7 @@ class DataPrepPage(QWidget):
         
         # ── Left Side: The Interactive Graph ──
         self.graph_container = QFrame()
-        self.graph_container.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
+        self.graph_container.setStyleSheet(f"background-color: {BG_MAIN}; border: none;")
         self.graph_layout = QVBoxLayout(self.graph_container)
         self.graph_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -62,7 +62,7 @@ class DataPrepPage(QWidget):
         ctrl_lay.addWidget(self.btn_load)
         
         self.lbl_file = QLabel("No file selected")
-        self.lbl_file.setStyleSheet(f"color: {ACCENT_COLOR}; font-size: 10px; border: none;")
+        self.lbl_file.setStyleSheet(f"color: {ACCENT}; font-size: 10px; border: none;")
         ctrl_lay.addWidget(self.lbl_file)
         
         line = QFrame(); line.setFixedHeight(1); line.setStyleSheet(f"background-color: {BORDER};")

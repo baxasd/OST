@@ -27,7 +27,7 @@ config = configparser.ConfigParser()
 config.read('settings.ini')
 
 HW_CFG_FILE     = config['Hardware']['radar_cfg_file']
-ZMQ_RADAR_PORT  = config['Network'].get('zmq_port', '5555')
+ZMQ_RADAR_PORT  = config['Network'].get('zmq_radar_port', '5555')
 ZMQ_CAM_PORT    = config['Network'].get('zmq_camera_port', '5556')
 
 VIEW_IP         = config['Viewer']['default_ip']

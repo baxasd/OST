@@ -25,7 +25,7 @@ config.read('settings.ini')
 HW_CFG_FILE = config['Hardware']['radar_cfg_file']
 HW_CLI_PORT = config['Hardware']['cli_port']
 HW_DATA_PORT = config['Hardware']['data_port']
-ZMQ_RADAR_PORT = config['Network'].get('zmq_port', '5555')
+ZMQ_RADAR_PORT = config['Network'].get('zmq_radar_port', '5555')
 ZMQ_CAM_PORT = config['Network'].get('zmq_camera_port', '5556')
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,9 +118,8 @@ def run_radar_stream(zmq_context: zmq.Context, record: bool):
 
 def run_camera_stream(zmq_context: zmq.Context, record: bool):
     """The infinite loop that captures video, runs AI, and broadcasts over ZeroMQ."""
-    log.info("Loading camera AI models...")
+    log.info("Loading camera AI models and hardware...")
     
-    # DEFERRED IMPORTS: We only load heavy ML models if the Camera is selected. Saves boot time.
     from sensors.realsense import RealSenseCamera
     from core.cv.depth import get_mean_depth, deproject_pixel_to_point
     from core.cv.pose import PoseEstimator
@@ -132,7 +131,17 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
     model_comp = int(config.get('Camera', 'model_complexity', fallback=1))
     jpeg_qual = int(config.get('Camera', 'jpeg_quality', fallback=80))
     
-    # Bind the Camera network port (5556)
+    # 1. BOOT HARDWARE FIRST
+    cam = RealSenseCamera(width=cam_w, height=cam_h, fps=cam_fps)
+    
+    # FIX: Abort immediately if the camera didn't physically connect!
+    if cam.pipeline is None:
+        log.error("CRITICAL: Camera not detected. Aborting stream.")
+        return
+
+    # 2. Boot AI and Network ONLY if the camera is successfully running
+    pose = PoseEstimator(model_complexity=model_comp)
+    
     zmq_socket = zmq_context.socket(zmq.PUB)
     zmq_socket.bind(f"tcp://*:{ZMQ_CAM_PORT}")
 
@@ -147,16 +156,14 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
     else:
         log.info("PREVIEW MODE: Broadcasting over ZMQ only.")
 
-    # Boot the RealSense physical hardware and the MediaPipe ML Engine
-    cam = RealSenseCamera(width=cam_w, height=cam_h, fps=cam_fps)
-    pose = PoseEstimator(model_complexity=model_comp)
-
     print("\n>>> CAMERA STREAM ACTIVE. Press Ctrl+C to stop. <<<\n")
     try:
         while True:
             # 1. Get raw video and depth matrices from the RealSense
             color_img, depth_frame = cam.get_frames()
             if color_img is None:
+                # FIX: Prevent the CPU from melting if the camera temporarily drops a frame
+                time.sleep(0.01)
                 continue
 
             h, w, _ = color_img.shape
@@ -168,7 +175,7 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
             frame_data = {"timestamp": time.time()}
             depth_intrin = None
 
-            # Get the physical properties of the camera lens (intrinsics) for 3D math
+            # Get the physical properties of the camera lens for 3D math
             if depth_frame:
                 depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
 
@@ -189,12 +196,11 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
                                 frame_data[f"j{i}_y"] = p[1]
                                 frame_data[f"j{i}_z"] = p[2]
 
-            # 5. Compress the raw image matrix into a tiny JPEG file to save network bandwidth
+            # 5. Compress the raw image matrix into a tiny JPEG file
             ret, jpeg_buffer = cv2.imencode('.jpg', color_img, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_qual])
             
             # 6. Network Broadcast
             if ret:
-                # Send a "Multipart" message. Part 1 is the Skeleton JSON, Part 2 is the JPEG image.
                 zmq_socket.send_multipart([
                     json.dumps(frame_data).encode('utf-8'),
                     jpeg_buffer.tobytes()
@@ -211,7 +217,7 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
         cam.stop()
         zmq_socket.close() 
         if writer: writer.close()
-
+        time.sleep(0.5) # Give the OS half a second to release the ports
 # ─────────────────────────────────────────────────────────────────────────────
 #  Main Application Menu
 # ─────────────────────────────────────────────────────────────────────────────

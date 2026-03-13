@@ -14,7 +14,7 @@ PANEL_WIDTH = 280
 # UNIVERSAL UI PALETTE (Fluent Design System)
 # ================================================
 # Backgrounds
-BG_DARK = "#F3F3F3"        # Windows base background (Absorbs glare)
+BG_MAIN = "#F3F3F3"        # Windows base background (Absorbs glare)
 BG_PANEL = "#FFFFFF"       # Elevated Card background (Pure White)
 BORDER = "#E5E5E5"         # Very soft, subtle divider lines
 GRID = "#605E5C" 
@@ -24,8 +24,8 @@ TEXT_MAIN = "#1A1A1A"      # Crisp near-black for primary readability
 TEXT_DIM = "#605E5C"       # Soft slate for secondary text
 
 # Branding & Accents
-ACCENT_COLOR = "#005FB8"   # Classic Windows 11 Blue (High contrast)
-ACCENT_HOVER = "#004E98"   # Slightly darker blue for active states
+ACCENT = "#005FB8"   # Classic Windows 11 Blue (High contrast)
+HOVER = "#004E98"   # Slightly darker blue for active states
 
 # Status & Console Colors
 COLOR_ERROR = "#C42B1C"    # Fluent UI Error Red
@@ -72,7 +72,7 @@ PLOT_ELB_R = "#D83B01"
 
 # Main Window & Modern Scrollbars
 CSS_MAIN_WINDOW = f"""
-    QMainWindow {{ background-color: {BG_DARK}; }}
+    QMainWindow {{ background-color: {BG_MAIN}; }}
     QScrollBar:vertical {{ background: transparent; width: 10px; margin: 0px; }}
     QScrollBar::handle:vertical {{ background-color: #CCCCCC; min-height: 20px; border-radius: 5px; margin: 2px; }}
     QScrollBar::handle:vertical:hover {{ background-color: #999999; }}
@@ -154,15 +154,15 @@ CSS_CHECKBOX = """
 # Modern Rounded Buttons
 CSS_BTN_PRIMARY = f"""
     QPushButton {{ 
-        background-color: {ACCENT_COLOR}; 
+        background-color: {ACCENT}; 
         color: #FFFFFF; 
         font-weight: 600; 
         font-size: 13px;
         padding: 8px 16px; 
-        border: 1px solid {ACCENT_COLOR}; 
+        border: 1px solid {ACCENT}; 
         border-radius: 6px; 
     }}
-    QPushButton:hover {{ background-color: {ACCENT_HOVER}; border-color: {ACCENT_HOVER}; }}
+    QPushButton:hover {{ background-color: {HOVER}; border-color: {HOVER}; }}
     QPushButton:pressed {{ background-color: #004080; }}
     QPushButton:disabled {{ background-color: #F3F3F3; color: #A19F9D; border: 1px solid {BORDER}; }}
 """
@@ -254,8 +254,8 @@ def get_base_path():
 BASE_DIR = get_base_path()
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
-ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
-COMMAND_ICON = os.path.join(ASSETS_DIR, "command.ico")
+MAIN_ICON = os.path.join(ASSETS_DIR, "icon-main-background.ico")
+SECONDARY_ICON = os.path.join(ASSETS_DIR, "command.ico")
 LOGO = os.path.join(ASSETS_DIR, "logo-main-transp.png")
 
 # ================================================

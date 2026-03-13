@@ -119,7 +119,7 @@ class RadarAnalysisPage(QWidget):
         scroll.setStyleSheet("QScrollArea { border: none; }")
         
         scroll_content = QWidget()
-        scroll_content.setStyleSheet(f"background-color: {BG_DARK}; border: none;")
+        scroll_content.setStyleSheet(f"background-color: {BG_MAIN}; border: none;")
         self.graph_layout = QVBoxLayout(scroll_content)
         self.graph_layout.setContentsMargins(10, 10, 10, 10)
         self.graph_layout.setSpacing(10)
@@ -164,7 +164,7 @@ class RadarAnalysisPage(QWidget):
         ctrl_lay.addWidget(self.btn_open)
 
         self.lbl_file = QLabel("No file selected")
-        self.lbl_file.setStyleSheet(f"color: {ACCENT_COLOR}; font-size: 10px; border: none;")
+        self.lbl_file.setStyleSheet(f"color: {ACCENT}; font-size: 10px; border: none;")
         self.lbl_file.setWordWrap(True)
         ctrl_lay.addWidget(self.lbl_file)
         ctrl_lay.addWidget(_line())
@@ -405,7 +405,7 @@ class RadarAnalysisPage(QWidget):
 
         cadence_str = "--"
         if spm > 0:
-            cadence_str = f"<span style='color: {ACCENT_COLOR}; font-weight: bold;'>{spm:.0f} SPM</span>"
+            cadence_str = f"<span style='color: {ACCENT}; font-weight: bold;'>{spm:.0f} SPM</span>"
 
         self.lbl_stats.setText(
             f"<b>Peak Velocity:</b> {peak_v:+.2f} m/s<br>"

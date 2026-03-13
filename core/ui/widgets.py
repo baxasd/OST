@@ -66,7 +66,7 @@ class MetricGraph(QWidget):
         # The Graph Canvas
         self.box = QFrame()
         self.box.setFixedHeight(80) 
-        self.box.setStyleSheet(f"background-color: {BG_DARK}; border: 1px solid {BORDER}; border-radius: 4px;")
+        self.box.setStyleSheet(f"background-color: {BG_MAIN}; border: 1px solid {BORDER}; border-radius: 4px;")
         box_lay = QVBoxLayout(self.box)
         box_lay.setContentsMargins(0, 0, 0, 0)
         

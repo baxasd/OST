@@ -52,7 +52,7 @@ class SkeletonDisplay(pg.PlotWidget):
         super().__init__()
         
         # 1. Base Environment Setup
-        self.setBackground(BG_DARK) 
+        self.setBackground(BG_MAIN) 
         self.setAspectLocked(True) # Forces X and Y to scale equally so the human doesn't stretch
         self.showGrid(x=True, y=True, alpha=0.3)
 
@@ -66,7 +66,7 @@ class SkeletonDisplay(pg.PlotWidget):
         
         # ScatterPlotItem is highly optimized. We feed it all the joints at once 
         # instead of drawing 13 individual points.
-        self.joints = pg.ScatterPlotItem(size=15, brush=pg.mkBrush(COLOR_JOINT), pen=pg.mkPen(BG_DARK, width=1))
+        self.joints = pg.ScatterPlotItem(size=15, brush=pg.mkBrush(COLOR_JOINT), pen=pg.mkPen(BG_MAIN, width=1))
         self.addItem(self.joints)
 
     def center_view(self, x, y):

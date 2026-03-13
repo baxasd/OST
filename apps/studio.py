@@ -11,10 +11,10 @@ from PyQt6.QtGui import QIcon
 from core.ui.theme import *
 
 # Import the four independent analytical modules
-from tab_prep import DataPrepPage
-from tab_viz import VisualizerPage
-from tab_gait import AnalysisPage
-from tab_radar import RadarAnalysisPage
+from tabs.tab_prep import DataPrepPage
+from tabs.tab_viz import VisualizerPage
+from tabs.tab_gait import AnalysisPage
+from tabs.tab_radar import RadarAnalysisPage
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Main Studio Window
@@ -32,8 +32,8 @@ class UnifiedWorkstation(QMainWindow):
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setStyleSheet(CSS_MAIN_WINDOW)
         
-        if os.path.exists(ICON): 
-            self.setWindowIcon(QIcon(ICON))
+        if os.path.exists(MAIN_ICON): 
+            self.setWindowIcon(QIcon(MAIN_ICON))
         
         # Create the central widget that holds everything
         central = QWidget()
@@ -53,7 +53,7 @@ class UnifiedWorkstation(QMainWindow):
         
         # App Title Logo
         title = QLabel("OST STUDIO")
-        title.setStyleSheet(f"color: {ACCENT_COLOR}; font-weight: 900; font-size: 16px; margin-right: 20px; border: none;")
+        title.setStyleSheet(f"color: {ACCENT}; font-weight: 900; font-size: 16px; margin-right: 20px; border: none;")
         nav_lay.addWidget(title)
         
         # Create the Navigation Buttons using our helper function
@@ -117,7 +117,7 @@ class UnifiedWorkstation(QMainWindow):
         btn.setStyleSheet(f"""
             QPushButton {{ color: {TEXT_DIM}; font-weight: bold; border: none; font-size: 12px; padding: 0 10px; height: 48px; }} 
             QPushButton:hover {{ color: {TEXT_MAIN}; }} 
-            QPushButton:checked {{ color: {ACCENT_COLOR}; border-bottom: 2px solid {ACCENT_COLOR}; }}
+            QPushButton:checked {{ color: {ACCENT}; border-bottom: 2px solid {ACCENT}; }}
         """)
         return btn
 
