@@ -13,7 +13,6 @@ class PipelineProcessor:
     @staticmethod
     def _get_all_joint_cols(df: pd.DataFrame) -> list:
         """
-        Helper Function: DRY (Don't Repeat Yourself) Optimization.
         Scans the DataFrame and returns a safe list of all X, Y, and Z columns 
         that actually exist in the current file.
         """

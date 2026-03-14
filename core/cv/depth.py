@@ -8,11 +8,6 @@ log = logging.getLogger("DepthMath")
 def get_mean_depth(depth_frame, px: int, py: int, w: int, h: int, patch: int = 1):
     """
     Calculates the average depth in a small grid (patch) around a specific pixel.
-    
-    Why use a patch? Infrared depth sensors often have "holes" (pixels that return 0.0) 
-    if the laser hits a reflective surface or a sharp edge. By looking at a 3x3 
-    pixel grid (patch=1), we guarantee we get an accurate depth reading even if the 
-    exact center pixel failed to register.
     """
     try:
         # 1. Safety Check: Ensure the hardware actually handed us a Depth Frame (not a Color frame)

@@ -56,7 +56,6 @@ def draw_2d_skeleton(frame):
         p2 = kinematics.get_point(frame, n2)
         
         if p1 and p2:
-            # Color logic directly from render.py
             c = "#8764B8" # Center (Purple)
             if "left" in n1 or "left" in n2: c = "#005FB8" # Left (Blue)
             elif "right" in n1 or "right" in n2: c = "#D83B01" # Right (Orange)
@@ -87,10 +86,8 @@ def draw_2d_skeleton(frame):
     
     if hip:
         center_x, center_y = hip[0], -hip[1]
-        # Draw the faint vertical reference line
         fig.add_vline(x=center_x, line_width=2, line_dash="dash", line_color="rgba(0,0,0,0.15)")
 
-    # Lock Aspect Ratio to the runner's exact location
     fig.update_layout(
         xaxis=dict(title='X (Horizontal)', range=[center_x - 1.0, center_x + 1.0], scaleanchor="y", scaleratio=1),
         yaxis=dict(title='Y (Vertical)', range=[center_y - 1.2, center_y + 1.2]),
@@ -142,19 +139,17 @@ def render():
             
             vals = kinematics.compute_all_metrics(current_frame)
             
-            with st.container(border=True):
-                st.markdown("**Trunk Lean**")
-                st.metric("Sagittal (Forward)", f"{vals['lean_x']:.1f}°")
-                st.metric("Frontal (Side)", f"{vals['lean_z']:.1f}°")
+            # OPTIMIZATION: Replaced repetitive containers with a metric layout loop
+            metrics_config = [
+                ("**Trunk Lean**", [("Sagittal (Forward)", 'lean_x'), ("Frontal (Side)", 'lean_z')]),
+                ("**Knee Flexion**", [("Left Knee", 'l_knee'), ("Right Knee", 'r_knee')]),
+                ("**Hip Flexion**", [("Left Hip", 'l_hip'), ("Right Hip", 'r_hip')])
+            ]
             
-            with st.container(border=True):
-                st.markdown("**Knee Flexion**")
-                st.metric("Left Knee", f"{vals['l_knee']:.1f}°")
-                st.metric("Right Knee", f"{vals['r_knee']:.1f}°")
-
-            with st.container(border=True):
-                st.markdown("**Hip Flexion**")
-                st.metric("Left Hip", f"{vals['l_hip']:.1f}°")
-                st.metric("Right Hip", f"{vals['r_hip']:.1f}°")
+            for section_title, metrics in metrics_config:
+                with st.container(border=True):
+                    st.markdown(section_title)
+                    for label, key in metrics:
+                        st.metric(label, f"{vals[key]:.1f}°")
     else:
         st.info("👈 Upload a dataset from the sidebar to inspect frames.")

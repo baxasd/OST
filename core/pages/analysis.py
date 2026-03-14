@@ -128,21 +128,19 @@ def render():
             fig_lean = create_kinematic_plot(plot_df, x_col, ['lean_x', 'lean_z'], ["Sagittal (X)", "Frontal (Z)"], ["#D83B01", "#005FB8"], "1. Trunk Lean Dynamics", show_env)
             st.plotly_chart(fig_lean, use_container_width=True)
 
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            with st.container(border=True):
-                fig_knee = create_kinematic_plot(plot_df, x_col, ['l_knee', 'r_knee'], ["Left Knee", "Right Knee"], ["#005FB8", "#D83B01"], "2. Knee Flexion", show_env)
-                st.plotly_chart(fig_knee, use_container_width=True)
-            with st.container(border=True):
-                fig_sho = create_kinematic_plot(plot_df, x_col, ['l_sho', 'r_sho'], ["Left Shoulder", "Right Shoulder"], ["#005FB8", "#D83B01"], "4. Shoulder Swing", show_env)
-                st.plotly_chart(fig_sho, use_container_width=True)
-                
-        with col_g2:
-            with st.container(border=True):
-                fig_hip = create_kinematic_plot(plot_df, x_col, ['l_hip', 'r_hip'], ["Left Hip", "Right Hip"], ["#005FB8", "#D83B01"], "3. Hip Flexion", show_env)
-                st.plotly_chart(fig_hip, use_container_width=True)
-            with st.container(border=True):
-                fig_elb = create_kinematic_plot(plot_df, x_col, ['l_elb', 'r_elb'], ["Left Elbow", "Right Elbow"], ["#005FB8", "#D83B01"], "5. Elbow Flexion", show_env)
-                st.plotly_chart(fig_elb, use_container_width=True)
+        # OPTIMIZATION: Removed repetitive column generation and replaced with a clean rendering loop
+        plots_config = [
+            ("2. Knee Flexion", ['l_knee', 'r_knee'], ["Left Knee", "Right Knee"]),
+            ("3. Hip Flexion", ['l_hip', 'r_hip'], ["Left Hip", "Right Hip"]),
+            ("4. Shoulder Swing", ['l_sho', 'r_sho'], ["Left Shoulder", "Right Shoulder"]),
+            ("5. Elbow Flexion", ['l_elb', 'r_elb'], ["Left Elbow", "Right Elbow"])
+        ]
+        
+        cols = st.columns(2)
+        for i, (title, y_cols, names) in enumerate(plots_config):
+            with cols[i % 2]: # Alternates perfectly between Left Col and Right Col
+                with st.container(border=True):
+                    fig = create_kinematic_plot(plot_df, x_col, y_cols, names, ["#005FB8", "#D83B01"], title, show_env)
+                    st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("👈 Upload your CLEANED dataset from the Data Prep tab to run the analysis.")

@@ -8,7 +8,6 @@ import configparser
 import cv2
 
 from core.radar.parser import parse_standard_frame
-from core.ui.theme import VERSION
 from core.io.storage import CameraSessionWriter, RadarSessionWriter
 
 # Set up the console logger so it prints clean, timestamped messages instead of ugly raw text
@@ -32,7 +31,7 @@ ZMQ_CAM_PORT = config['Network'].get('zmq_camera_port', '5556')
 #  Hardware Connection Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def connect_radar():
-    # DEFERRED IMPORT: We only import the hardware driver if the user actually selects Radar.
+    # We only import the hardware driver if the user actually selects Radar.
     from sensors.mmWave import RadarSensor 
     
     log.info("Connecting to Texas Instruments hardware...")
@@ -124,22 +123,22 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
     from core.cv.depth import get_mean_depth, deproject_pixel_to_point
     from core.cv.pose import PoseEstimator
     
-    # Pull settings dynamically from the INI file
+    # Pull settings
     cam_w = int(config.get('Camera', 'width', fallback=640))
     cam_h = int(config.get('Camera', 'height', fallback=480))
     cam_fps = int(config.get('Camera', 'fps', fallback=30))
     model_comp = int(config.get('Camera', 'model_complexity', fallback=1))
     jpeg_qual = int(config.get('Camera', 'jpeg_quality', fallback=80))
     
-    # 1. BOOT HARDWARE FIRST
+    # BOOT HARDWARE FIRST
     cam = RealSenseCamera(width=cam_w, height=cam_h, fps=cam_fps)
     
-    # FIX: Abort immediately if the camera didn't physically connect!
+    # Abort immediately if the camera didn't physically connect!
     if cam.pipeline is None:
         log.error("CRITICAL: Camera not detected. Aborting stream.")
         return
 
-    # 2. Boot AI and Network ONLY if the camera is successfully running
+    # Boot AI and Network ONLY if the camera is successfully running
     pose = PoseEstimator(model_complexity=model_comp)
     
     zmq_socket = zmq_context.socket(zmq.PUB)
@@ -148,10 +147,8 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
     writer = None
     if record:
         print("\n--- STARTING AUTOMATIC CAMERA RECORDING ---")
-        subj = "Auto"
-        act = "Camera"
         meta = {"Date": datetime.datetime.now().isoformat()}
-        writer = CameraSessionWriter(subj, act, metadata=meta)
+        writer = CameraSessionWriter(metadata=meta)
         log.info(f"RECORD MODE: Broadcasting over ZMQ and saving to {writer.filepath}")
     else:
         log.info("PREVIEW MODE: Broadcasting over ZMQ only.")
@@ -159,19 +156,19 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
     print("\n>>> CAMERA STREAM ACTIVE. Press Ctrl+C to stop. <<<\n")
     try:
         while True:
-            # 1. Get raw video and depth matrices from the RealSense
+            # Get raw video and depth matrices from the RealSense
             color_img, depth_frame = cam.get_frames()
             if color_img is None:
-                # FIX: Prevent the CPU from melting if the camera temporarily drops a frame
+                # Prevent the CPU from melting if the camera temporarily drops a frame
                 time.sleep(0.01)
                 continue
 
             h, w, _ = color_img.shape
             
-            # 2. Run the image through MediaPipe to find the 2D skeleton joints
+            # Run the image through MediaPipe to find the 2D skeleton joints
             landmarks = pose.estimate(color_img)
             
-            # 3. Create the data dictionary to send over the network
+            # Create the data dictionary to send over the network
             frame_data = {"timestamp": time.time()}
             depth_intrin = None
 
@@ -187,7 +184,7 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
                         # Draw a green dot directly onto the video frame
                         cv2.circle(color_img, (cx, cy), 3, (0, 255, 0), -1)
                         
-                        # 4. Math: Convert 2D pixel to 3D physical coordinate in real-world meters
+                        # Math: Convert 2D pixel to 3D physical coordinate in real-world meters
                         if depth_intrin:
                             dist = get_mean_depth(depth_frame, cx, cy, w, h)
                             if dist:
@@ -196,17 +193,17 @@ def run_camera_stream(zmq_context: zmq.Context, record: bool):
                                 frame_data[f"j{i}_y"] = p[1]
                                 frame_data[f"j{i}_z"] = p[2]
 
-            # 5. Compress the raw image matrix into a tiny JPEG file
+            # Compress the raw image matrix into a tiny JPEG file
             ret, jpeg_buffer = cv2.imencode('.jpg', color_img, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_qual])
             
-            # 6. Network Broadcast
+            # Network Broadcast
             if ret:
                 zmq_socket.send_multipart([
                     json.dumps(frame_data).encode('utf-8'),
                     jpeg_buffer.tobytes()
                 ])
 
-            # 7. Disk Write
+            # Disk Write
             if record and writer:
                 writer.write_frame(frame_data)
 
@@ -228,7 +225,7 @@ def main():
     
     while True:
         print("\n=========================================")
-        print(f"        OST PUBLISHER v{VERSION}       ")
+        print(f"        OST PUBLISHER      ")
         print("=========================================")
         print("RADAR OPTIONS:")
         print("  1. Preview Radar")

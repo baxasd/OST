@@ -53,7 +53,7 @@ class PoseEstimator:
             # MediaPipe returns normalized coordinates (0.0 to 1.0) based on the padded image.
             # 1. Multiply by target_size to get the exact pixel coordinate in the padded image.
             # 2. Subtract the padding to get the pixel coordinate in the resized image.
-            # 3. Divide by scale to stretch it back up to the original 1080p/720p image size.
+            # 3. Divide by scale to stretch it back up to the original image size.
             x = (lm.x * self.target_size - pad_x) / scale
             y = (lm.y * self.target_size - pad_y) / scale
             z = lm.z / scale     
@@ -68,7 +68,6 @@ class PoseEstimator:
         Returns None if no human body is detected.
         """
         try:
-            # OPTIMIZATION: Convert colorspace BEFORE padding. 
             # MediaPipe requires RGB, but OpenCV uses BGR. By converting here, 
             # we avoid wasting CPU time converting the pure black padding borders later.
             img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
