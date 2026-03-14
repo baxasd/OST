@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Import our modular page views
-from views import launcher, data_prep, analysis, radar, visualizer
+from core.pages import hub, prep, analysis, radar, viz
 
 # ─── PAGE SETUP ──────────────────────────────────────────────────────────────
 st.set_page_config(page_title="OST Studio", layout="wide", initial_sidebar_state="expanded")
@@ -17,13 +17,12 @@ if 'validation_report' not in st.session_state: st.session_state.validation_repo
 
 # ─── NAVIGATION ENGINE ───────────────────────────────────────────────────────
 if st.session_state.current_page == "launcher":
-    launcher.render()
+    hub.render()
 elif st.session_state.current_page == "data_prep":
-    data_prep.render()
+    prep.render()
 elif st.session_state.current_page == "analysis":
     analysis.render()
-# Add this to your NAVIGATION ENGINE at the bottom
 elif st.session_state.current_page == "radar":
     radar.render()
 elif st.session_state.current_page == "visualizer":
-    visualizer.render()
+    viz.render()
