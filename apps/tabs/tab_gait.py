@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.exporters # Required for saving plots to PNG
 from PyQt6.QtWidgets import *
@@ -9,25 +10,18 @@ from core.ui.theme import *
 from core.io import storage, structs
 from core.ui.widgets import HeavyTaskWorker
 
-# We wrap this in a try-except block just in case the SciPy/Sklearn 
-# dependencies for the Fatigue Analyzer aren't installed on the user's PC.
-try:
-    from core.math.fatigue import FatigueAnalyzer
-except ImportError:
-    FatigueAnalyzer = None
-
 class AnalysisPage(QWidget):
     """
     The Postural Breakdown and Gait Analysis Dashboard.
-    Calculates angles, systemic drift, and exports professional reports.
+    Calculates basic joint angles, systemic drift, and exports professional per-second reports.
     """
     def __init__(self):
         super().__init__()
         # ── State Variables ──
-        self.ts_df = None           # Timeseries DataFrame (Angles over time)
-        self.fatigue_df = None      # DataFrame containing Mahalanobis drift distances
+        self.ts_df = None           # Raw Timeseries DataFrame (Angles over time)
+        self.df_per_sec = None      # Aggregated second-by-second DataFrame
         self.stats_df = None        # Summary statistics (Mean, Min, Max)
-        self.adv_metrics = {}       # Dictionary holding trendlines and slopes
+        self.trend_metrics = {}     # Dictionary holding trendlines and slopes
         self.active_session = None
         self.subj = "Unknown"
         self.act = "Unknown"
@@ -37,77 +31,62 @@ class AnalysisPage(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # Left Side: A Scrollable Area for the 6 Graphs
+        # Left Side: A Scrollable Area for the 5 Graphs
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; }")
         
         scroll_content = QWidget()
-        scroll_content.setStyleSheet(f"background-color: {BG_MAIN}; border: none;")
+        scroll_content.setStyleSheet(f"background-color: {BG_PANEL}; border: none;") 
         self.graph_layout = QVBoxLayout(scroll_content)
         self.graph_layout.setContentsMargins(10, 10, 10, 10)
         self.graph_layout.setSpacing(10)
         
-        # ── Graph 1: Systemic Drift (Mahalanobis) ──
-        self.p_mahal = self._create_base_plot("Mahalanobis Distance")
-        self.c_mahal = self.p_mahal.plot(pen=pg.mkPen(color=ACCENT, width=2), autoDownsample=True, clipToView=True)
-        
-        # Adds a red dotted line to show the critical failure threshold
-        self.thresh_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(COLOR_ERROR, width=1, style=Qt.PenStyle.DotLine))
-        self.p_mahal.addItem(self.thresh_line)
-        self.card_mahal = self._make_graph_panel(
-            "Multivariate Postural Deviation", 
-            "Tracks the multivariate distance of the subject's current posture compared to their baseline state. "
-            "Significant increases may indicate fatigue-related postural drift.", 
-            self.p_mahal, [("Drift", ACCENT), ("Critical Threshold", COLOR_ERROR)]
-        )
-        self.graph_layout.addWidget(self.card_mahal)
-        
-        # ── Graph 2: Trunk Lean (with Variance Envelopes) ──
+        # ── Graph 1: Trunk Lean (with Variance Envelopes) ──
         self.p_lean = self._create_base_plot("Degrees")
         
-        # Z-Axis (Forward/Backward Lean)
+        # Z-Axis (Side-to-Side Lean)
         self.c_lean_z_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_Z, width=2), autoDownsample=True, clipToView=True)
-        self.c_lean_z_upper = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True) # Invisible upper bound
-        self.c_lean_z_lower = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True) # Invisible lower bound
-        self.lean_z_fill = pg.FillBetweenItem(self.c_lean_z_lower, self.c_lean_z_upper, brush=(85, 85, 255, 50)) # Blue shade
+        self.c_lean_z_upper = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True) 
+        self.c_lean_z_lower = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True) 
+        self.lean_z_fill = pg.FillBetweenItem(self.c_lean_z_lower, self.c_lean_z_upper, brush=(85, 85, 255, 50)) 
         
-        # X-Axis (Side-to-Side Lean)
+        # X-Axis (Forward/Backward Lean)
         self.c_lean_x_mean = pg.PlotDataItem(pen=pg.mkPen(PLOT_LEAN_X, width=2), autoDownsample=True, clipToView=True)
         self.c_lean_x_upper = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True)
         self.c_lean_x_lower = pg.PlotDataItem(pen=pg.mkPen(None), autoDownsample=True, clipToView=True)
-        self.lean_x_fill = pg.FillBetweenItem(self.c_lean_x_lower, self.c_lean_x_upper, brush=(255, 85, 85, 50)) # Red shade
+        self.lean_x_fill = pg.FillBetweenItem(self.c_lean_x_lower, self.c_lean_x_upper, brush=(255, 85, 85, 50)) 
 
         # Add all items to the plot
         self.p_lean.addItem(self.c_lean_z_mean); self.p_lean.addItem(self.c_lean_z_upper); self.p_lean.addItem(self.c_lean_z_lower); self.p_lean.addItem(self.lean_z_fill)
         self.p_lean.addItem(self.c_lean_x_mean); self.p_lean.addItem(self.c_lean_x_upper); self.p_lean.addItem(self.c_lean_x_lower); self.p_lean.addItem(self.lean_x_fill)
         
-        self.card_lean = self._make_graph_panel("Trunk Lean Dynamics", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Sagittal (Z)", PLOT_LEAN_Z), ("Frontal (X)", PLOT_LEAN_X)])
+        self.card_lean = self._make_graph_panel("1. Trunk Lean Dynamics", "Sagittal (Forward/Back) and Frontal (Side-to-Side) Core Stability.", self.p_lean, [("Frontal (Z)", PLOT_LEAN_Z), ("Sagittal (X)", PLOT_LEAN_X)])
         self.graph_layout.addWidget(self.card_lean)
         
-        # ── Graphs 3-6: Standard Joint Angles ──
+        # ── Graphs 2-5: Standard Joint Angles ──
         self.p_knee = self._create_base_plot("Degrees")
         self.c_knee_l = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_L, width=1.5), autoDownsample=True, clipToView=True)
         self.c_knee_r = self.p_knee.plot(pen=pg.mkPen(PLOT_KNEE_R, width=1.5), autoDownsample=True, clipToView=True)
-        self.card_knee = self._make_graph_panel("3. Knee Flexion Dynamics", "Left vs Right Knee joint angles.", self.p_knee, [("Left Knee", PLOT_KNEE_L), ("Right Knee", PLOT_KNEE_R)])
+        self.card_knee = self._make_graph_panel("2. Knee Flexion Dynamics", "Left vs Right Knee joint angles.", self.p_knee, [("Left Knee", PLOT_KNEE_L), ("Right Knee", PLOT_KNEE_R)])
         self.graph_layout.addWidget(self.card_knee)
 
         self.p_hip = self._create_base_plot("Degrees")
         self.c_hip_l = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_L, width=1.5), autoDownsample=True, clipToView=True)
         self.c_hip_r = self.p_hip.plot(pen=pg.mkPen(PLOT_HIP_R, width=1.5), autoDownsample=True, clipToView=True)
-        self.card_hip = self._make_graph_panel("4. Hip Flexion", "Left vs Right Hip drive.", self.p_hip, [("Left Hip", PLOT_HIP_L), ("Right Hip", PLOT_HIP_R)])
+        self.card_hip = self._make_graph_panel("3. Hip Flexion", "Left vs Right Hip drive.", self.p_hip, [("Left Hip", PLOT_HIP_L), ("Right Hip", PLOT_HIP_R)])
         self.graph_layout.addWidget(self.card_hip)
 
         self.p_sho = self._create_base_plot("Degrees")
         self.c_sho_l = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_L, width=1.5), autoDownsample=True, clipToView=True)
         self.c_sho_r = self.p_sho.plot(pen=pg.mkPen(PLOT_SHO_R, width=1.5), autoDownsample=True, clipToView=True)
-        self.card_sho = self._make_graph_panel("5. Shoulder Swing Dynamics", "Left vs Right Shoulder extension.", self.p_sho, [("Left Shoulder", PLOT_SHO_L), ("Right Shoulder", PLOT_SHO_R)])
+        self.card_sho = self._make_graph_panel("4. Shoulder Swing Dynamics", "Left vs Right Shoulder extension.", self.p_sho, [("Left Shoulder", PLOT_SHO_L), ("Right Shoulder", PLOT_SHO_R)])
         self.graph_layout.addWidget(self.card_sho)
 
         self.p_elb = self._create_base_plot("Degrees")
         self.c_elb_l = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_L, width=1.5), autoDownsample=True, clipToView=True)
         self.c_elb_r = self.p_elb.plot(pen=pg.mkPen(PLOT_ELB_R, width=1.5), autoDownsample=True, clipToView=True)
-        self.card_elb = self._make_graph_panel("6. Elbow Flexion Dynamics", "Left vs Right Elbow tracking.", self.p_elb, [("Left Elbow", PLOT_ELB_L), ("Right Elbow", PLOT_ELB_R)])
+        self.card_elb = self._make_graph_panel("5. Elbow Flexion Dynamics", "Left vs Right Elbow tracking.", self.p_elb, [("Left Elbow", PLOT_ELB_L), ("Right Elbow", PLOT_ELB_R)])
         self.graph_layout.addWidget(self.card_elb)
 
         scroll.setWidget(scroll_content)
@@ -135,6 +114,7 @@ class AnalysisPage(QWidget):
         # Resampling dropdown
         self.cmb_grouping = QComboBox()
         self.cmb_grouping.addItems(["Frames (Raw)", "Seconds (Averaged)", "Minutes (Averaged)"])
+        self.cmb_grouping.setCurrentIndex(1) # Default to seconds
         self.cmb_grouping.setStyleSheet(CSS_INPUT)
         self.cmb_grouping.currentIndexChanged.connect(self.recalculate_plots)
         ctrl_lay.addWidget(self.cmb_grouping)
@@ -221,11 +201,10 @@ class AnalysisPage(QWidget):
                 QMessageBox.critical(self, "Error", f"Failed to load data:\n{str(e)}")
 
     def process_session(self, session, subj, act):
-        """Starts the heavy math engine on a background thread so the UI doesn't freeze."""
-        if not FatigueAnalyzer: return
+        """Starts the basic math engine on a background thread so the UI doesn't freeze."""
         self.active_session = session; self.subj = subj; self.act = act
         
-        self.txt_console.setText("Running heavy fatigue analysis in background...\nPlease wait.")
+        self.txt_console.setText("Running basic kinematics analysis...\nAggregating to seconds...")
         self.btn_load.setEnabled(False)
         self.btn_load.setText("Processing...")
         
@@ -236,25 +215,39 @@ class AnalysisPage(QWidget):
         self.worker.start()
 
     def _run_math_pipeline(self, session):
-        """Runs the actual kinematics math (This happens in the background)."""
-        ts_df, stats_df = kinematics.generate_analysis_report(session)
+        """Runs the basic kinematics math and per-second aggregations."""
+        ts_df, _ = kinematics.generate_analysis_report(session)
         
-        # OPTIMIZATION: Decimate Data. 
-        # Analyzing 100,000 frames at 30fps is overkill for fatigue (which happens over minutes).
-        # We take every 3rd frame (10fps) to drastically speed up the Mahalanobis matrix math.
-        if len(ts_df) > 5000:
-            ts_df = ts_df.iloc[::3, :].copy() 
-            fps = session.fps / 3.0
-        else:
-            fps = session.fps
+        # 1. Convert to integer seconds
+        ts_df['time_sec'] = np.floor(ts_df['timestamp']).astype(int)
+        numeric_cols = [c for c in ts_df.columns if c not in ['frame', 'time_sec', 'timestamp']]
+        
+        # 2. Aggregate per second
+        df_per_sec = ts_df.groupby('time_sec')[numeric_cols].mean().reset_index()
+        # Ensure timestamp exists for UI plotting logic
+        df_per_sec['timestamp'] = df_per_sec['time_sec']
+        
+        # 3. Calculate basic drift (linear regression slope per minute)
+        trend_metrics = {}
+        if len(df_per_sec) > 1:
+            x_mins = df_per_sec['time_sec'] / 60.0
             
-        analyzer = FatigueAnalyzer(ts_df, fps=fps)
-        fatigue_df, _, _, adv_metrics = analyzer.run_pipeline()
-        return ts_df, stats_df, fatigue_df, adv_metrics
+            for col in numeric_cols:
+                mask = ~np.isnan(df_per_sec[col])
+                if mask.sum() > 1:
+                    # np.polyfit(X, Y, 1) returns [slope, intercept]
+                    slope, _ = np.polyfit(x_mins[mask], df_per_sec[col][mask], 1)
+                    trend_metrics[f"slope_{col}"] = slope
+
+        # 4. Generate Summary Stats. 
+        # .T transposes it so metrics are the rows and stats (mean, min, max) are the columns
+        stats_df = df_per_sec.drop(columns=['time_sec', 'timestamp'], errors='ignore').describe().T
+
+        return ts_df, df_per_sec, stats_df, trend_metrics
 
     def _on_pipeline_complete(self, result):
         """Callback when the math finishes."""
-        self.ts_df, self.stats_df, self.fatigue_df, self.adv_metrics = result
+        self.ts_df, self.df_per_sec, self.stats_df, self.trend_metrics = result
         self._update_console()
         self.recalculate_plots()
         self.btn_export.setEnabled(True)
@@ -269,23 +262,21 @@ class AnalysisPage(QWidget):
 
     def _update_console(self):
         """Prints a clean ASCII table of the runner's joint statistics."""
-        desc = self.adv_metrics['describe']
-        text = f"METRICS SUMMARY\n"
+        text = f"METRICS SUMMARY (Per Second Avg)\n"
         text += f"Subj: {self.subj} | Act: {self.act}\n"
         text += "="*78 + "\n"
         text += f"{'METRIC':<14} | {'MEAN':>7} | {'STD':>7} | {'MIN':>7} | {'MAX':>7} | {'MEDIAN':>7} | {'TREND/MIN':>9}\n"
         text += "-"*78 + "\n"
         
-        for idx, row in desc.iterrows():
+        for idx, row in self.stats_df.iterrows():
             col_name = str(idx)
-            if col_name in ['timestamp', 'frame', 'minute']: continue
             
             mean = row.get('mean', 0)
             std = row.get('std', 0)
             vmin = row.get('min', 0)
             vmax = row.get('max', 0)
             med = row.get('50%', 0)
-            trend = self.adv_metrics.get(f'slope_{col_name}', 0.0)
+            trend = self.trend_metrics.get(f'slope_{col_name}', 0.0)
             text += f"{col_name:<14} | {mean:>7.2f} | {std:>7.2f} | {vmin:>7.2f} | {vmax:>7.2f} | {med:>7.2f} | {trend:>+9.3f}\n"
             
         text += "="*78 + "\n"
@@ -293,41 +284,53 @@ class AnalysisPage(QWidget):
 
     def recalculate_plots(self):
         """Updates the visual graphs. Resamples data if requested by the ComboBox."""
-        if self.ts_df is None or self.fatigue_df is None: return
+        if self.ts_df is None or self.df_per_sec is None: return
         
-        df = self.ts_df.copy()
-        df['mahalanobis_dist'] = self.fatigue_df['mahalanobis_dist']
         grouping = self.cmb_grouping.currentText()
         x_label = "Frames"
         
-        # Resample data by taking averages over Seconds or Minutes
-        if "Seconds" in grouping:
-            df['time_grp'] = df['timestamp'].astype(int)
-            df = df.groupby('time_grp').mean().reset_index()
+        # Resample data dynamically for the UI 
+        if "Frames" in grouping:
+            df = self.ts_df.copy()
+            x_label = "Frames"
+        elif "Seconds" in grouping:
+            # Using our pre-calculated second data!
+            df = self.df_per_sec.copy()
             x_label = "Seconds"
         elif "Minutes" in grouping:
+            df = self.ts_df.copy()
             df['time_grp'] = (df['timestamp'] / 60).astype(int)
             df = df.groupby('time_grp').mean().reset_index()
             x_label = "Minutes"
             
-        x_vals = df.index.values
-        
-        # 1. Update Drift Plot
-        self.c_mahal.setData(x_vals, df['mahalanobis_dist'].values)
-        self.thresh_line.setPos(2.0)
+        # 1. SAVE THE EXACT DATAFRAME FOR THE EXPORTER
+        self.current_export_df = df.copy() 
+        self.current_export_label = x_label
+
+        # 2. UI ANTI-LAG OPTIMIZATION
+        # If we have thousands of points, rendering the variance shadow during scroll is laggy.
+        # We downsample the data *purely* for the visuals.
+        MAX_UI_POINTS = 1500
+        if len(df) > MAX_UI_POINTS:
+            step = len(df) // MAX_UI_POINTS
+            plot_df = df.iloc[::step]
+        else:
+            plot_df = df
+            
+        x_vals = plot_df.index.values
         
         # Update X-Axis labels across all plots
-        for p in [self.p_mahal, self.p_lean, self.p_knee, self.p_hip, self.p_sho, self.p_elb]: 
+        for p in [self.p_lean, self.p_knee, self.p_hip, self.p_sho, self.p_elb]: 
             p.setLabel('bottom', x_label)
 
-        # 2. Update Lean Plot (with Variance Envelope Optimization)
+        # 3. Update Lean Plot (Using plot_df to prevent lag)
         if self.chk_env.isChecked():
             # OPTIMIZATION: Only run rolling calculations if the checkbox is actively checked.
-            window_size = max(1, len(df)//20)
-            roll_z_mean = df['lean_z'].rolling(window_size, min_periods=1).mean().values
-            roll_z_std = df['lean_z'].rolling(window_size, min_periods=1).std().fillna(0).values
-            roll_x_mean = df['lean_x'].rolling(window_size, min_periods=1).mean().values
-            roll_x_std = df['lean_x'].rolling(window_size, min_periods=1).std().fillna(0).values
+            window_size = max(1, len(plot_df)//20)
+            roll_z_mean = plot_df['lean_z'].rolling(window_size, min_periods=1).mean().values
+            roll_z_std = plot_df['lean_z'].rolling(window_size, min_periods=1).std().fillna(0).values
+            roll_x_mean = plot_df['lean_x'].rolling(window_size, min_periods=1).mean().values
+            roll_x_std = plot_df['lean_x'].rolling(window_size, min_periods=1).std().fillna(0).values
             
             self.c_lean_z_mean.setData(x_vals, roll_z_mean)
             self.c_lean_z_upper.setData(x_vals, roll_z_mean + roll_z_std)
@@ -341,57 +344,58 @@ class AnalysisPage(QWidget):
             self.lean_x_fill.setVisible(True)
         else:
             # If envelopes are off, just plot the raw mean line and clear the upper/lower bounds
-            self.c_lean_z_mean.setData(x_vals, df['lean_z'].values)
+            self.c_lean_z_mean.setData(x_vals, plot_df['lean_z'].values)
             self.c_lean_z_upper.setData([], [])
             self.c_lean_z_lower.setData([], [])
             
-            self.c_lean_x_mean.setData(x_vals, df['lean_x'].values)
+            self.c_lean_x_mean.setData(x_vals, plot_df['lean_x'].values)
             self.c_lean_x_upper.setData([], [])
             self.c_lean_x_lower.setData([], [])
             
             self.lean_z_fill.setVisible(False)
             self.lean_x_fill.setVisible(False)
 
-        # 3. Update Standard Angle Plots
-        self.c_knee_l.setData(x_vals, df['l_knee'].values)
-        self.c_knee_r.setData(x_vals, df['r_knee'].values)
-        self.c_hip_l.setData(x_vals, df['l_hip'].values)
-        self.c_hip_r.setData(x_vals, df['r_hip'].values)
-        self.c_sho_l.setData(x_vals, df['l_sho'].values)
-        self.c_sho_r.setData(x_vals, df['r_sho'].values)
-        self.c_elb_l.setData(x_vals, df['l_elb'].values)
-        self.c_elb_r.setData(x_vals, df['r_elb'].values)
+        # 4. Update Standard Angle Plots
+        self.c_knee_l.setData(x_vals, plot_df['l_knee'].values)
+        self.c_knee_r.setData(x_vals, plot_df['r_knee'].values)
+        self.c_hip_l.setData(x_vals, plot_df['l_hip'].values)
+        self.c_hip_r.setData(x_vals, plot_df['r_hip'].values)
+        self.c_sho_l.setData(x_vals, plot_df['l_sho'].values)
+        self.c_sho_r.setData(x_vals, plot_df['r_sho'].values)
+        self.c_elb_l.setData(x_vals, plot_df['l_elb'].values)
+        self.c_elb_r.setData(x_vals, plot_df['r_elb'].values)
 
     def export_results(self):
-        """Takes screenshots of all 6 graphs and exports the CSV data."""
+        """Exports the aggregated CSV data, summary stats, and PNG screenshots of all graphs."""
         dir_path = QFileDialog.getExistingDirectory(self, "Select Directory to Export Report and Plots")
         if not dir_path: return
         
         try:
-            # Save the CSV stats and text file
-            self.adv_metrics['describe'].to_csv(os.path.join(dir_path, f"{self.subj}_{self.act}_SummaryStats.csv"), index=True)
-            with open(os.path.join(dir_path, f"{self.subj}_{self.act}_AdvancedMetrics.txt"), "w") as f:
-                f.write(self.txt_console.toPlainText())
+            # 1. Save the timeseries data matching what the user currently selected (Frames, Seconds, Mins)
+            if hasattr(self, 'current_export_df'):
+                file_label = getattr(self, 'current_export_label', 'Data')
+                self.current_export_df.to_csv(os.path.join(dir_path, f"{self.subj}_{self.act}_{file_label}.csv"), index=False)
+            
+            # 2. Save ONLY the proper Summary Stats
+            self.stats_df.to_csv(os.path.join(dir_path, f"{self.subj}_{self.act}_SummaryStats.csv"), index=True)
 
             # Define the specific plots we want to take a picture of
             plots = [
-                (self.p_mahal, "1_Drift"), 
-                (self.p_lean, "2_Lean"), 
-                (self.p_knee, "3_Knees"), 
-                (self.p_hip, "4_Hips"), 
-                (self.p_sho, "5_Shoulders"), 
-                (self.p_elb, "6_Elbows")
+                (self.p_lean, "1_Lean"), 
+                (self.p_knee, "2_Knees"), 
+                (self.p_hip, "3_Hips"), 
+                (self.p_sho, "4_Shoulders"), 
+                (self.p_elb, "5_Elbows")
             ]
             
             # processEvents forces the UI to fully draw the graphs before taking the screenshot
             QApplication.processEvents()
             
             for plot, name in plots:
-                # pyqtgraph.exporters lets us render the graph widget directly to a high-res PNG image
                 exporter = pyqtgraph.exporters.ImageExporter(plot.scene())
-                exporter.parameters()['width'] = 1200 # Enforce a clean 1200px width
+                exporter.parameters()['width'] = 1200 
                 exporter.export(os.path.join(dir_path, f"{self.subj}_{self.act}_{name}.png"))
                 
-            QMessageBox.information(self, "Export Complete", f"Data exported to {dir_path}")
+            QMessageBox.information(self, "Export Complete", f"CSV, summary, and plots exported to:\n{dir_path}")
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"An error occurred:\n{str(e)}")

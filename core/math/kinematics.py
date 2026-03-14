@@ -27,9 +27,8 @@ def _get_vec(frame: Frame, name_or_id):
 
 def _get_trunk_midpoints(f: Frame):
     """
-    OPTIMIZATION: Helper function that calculates the center of the hips and 
-    center of the shoulders. Used for drawing the skeleton and calculating lean.
-    Saves us from calculating this 3 separate times per frame!
+    Helper function that calculates the center of the hips and 
+    center of the shoulders. Used for drawing the skeleton and calculating X-lean.
     """
     rh = _get_vec(f, "right_hip")
     lh = _get_vec(f, "left_hip")
@@ -85,40 +84,40 @@ def calculate_joint_angle(f: Frame, p1: str, p2: str, p3: str) -> float:
     norm_ba = np.linalg.norm(ba)
     norm_bc = np.linalg.norm(bc)
     
-    # Prevent divide-by-zero errors if the joints perfectly overlap
     if norm_ba == 0 or norm_bc == 0: return 0.0
 
-    # Dot Product Formula: A·B = |A||B|cos(θ)
+    # Dot Product Formula
     cosine_angle = np.dot(ba, bc) / (norm_ba * norm_bc)
-    
-    # Clip prevents floating point rounding errors (like 1.0000000002) from crashing arccos
     angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
 
     return float(np.degrees(angle))
 
 
 def calculate_frontal_lean(f: Frame) -> float:
-    """Calculates Side-to-Side Lean (X-Y plane)."""
+    """
+    Calculates Forward/Backward Lean (X-Y plane).
+    Valid & Accurate: Uses the midpoints because X/Y pixels are reliable and 
+    averaging them perfectly cancels out the reciprocal twisting of the shoulders.
+    """
     mid_hip, mid_shoulder = _get_trunk_midpoints(f)
     if mid_hip is None: return 0.0
 
-    # X (horizontal) and Y (vertical) difference between hips and shoulders
     dx = mid_shoulder[0] - mid_hip[0]
     dy = mid_shoulder[1] - mid_hip[1]
     
-    # Use arctan2 to get the angle relative to the vertical axis.
-    # Note: -dy is used because image coordinates have Y=0 at the TOP of the screen!
     return float(np.degrees(np.arctan2(dx, -dy)))
 
 
 def calculate_sagittal_lean(f: Frame) -> float:
-    """Calculates Forward/Backward Lean (Z-Y plane)."""
-    mid_hip, mid_shoulder = _get_trunk_midpoints(f)
-    if mid_hip is None: return 0.0
+    """Calculates Side-to-Side Lean (Z-Y plane) using the Right side."""
+    rh = _get_vec(f, "right_hip")
+    rs = _get_vec(f, "right_shoulder")
+
+    if rh is None or rs is None: return 0.0
 
     # Z (depth) and Y (vertical) difference
-    dz = mid_shoulder[2] - mid_hip[2]
-    dy = mid_shoulder[1] - mid_hip[1]
+    dz = rs[2] - rh[2]
+    dy = rs[1] - rh[1]
     
     return float(np.degrees(np.arctan2(dz, -dy)))
 
@@ -128,8 +127,8 @@ def calculate_sagittal_lean(f: Frame) -> float:
 def compute_all_metrics(f: Frame) -> dict:
     """Calculates all 8 core postural metrics for a single frame."""
     return {
-        'lean_x': calculate_frontal_lean(f),   # Side-to-side
-        'lean_z': calculate_sagittal_lean(f),  # Forward/Back
+        'lean_x': calculate_frontal_lean(f),   # Forward/Back (X-Y Plane)
+        'lean_z': calculate_sagittal_lean(f),  # Side-to-Side (Z-Y Plane)
         
         'l_knee': calculate_joint_angle(f, "left_hip", "left_knee", "left_ankle"),
         'r_knee': calculate_joint_angle(f, "right_hip", "right_knee", "right_ankle"),
@@ -157,15 +156,11 @@ def generate_analysis_report(session):
         metrics_dict['frame'] = f.frame_id
         data.append(metrics_dict)
     
-    # Create the full Line-Graph timeseries dataset
     df_timeseries = pd.DataFrame(data)
     
-    # Reorder columns to strictly ensure timestamp and frame are first
     cols = ['timestamp', 'frame'] + [c for c in df_timeseries.columns if c not in ['timestamp', 'frame']]
     df_timeseries = df_timeseries[cols]
     
-    # Automatically calculate count, mean, std, min, 25%, 50% (median), 75%, and max
-    # We drop timestamp and frame from this calculation because the "average timestamp" is meaningless data.
     df_stats = df_timeseries.drop(columns=['timestamp', 'frame']).describe()
     
     return df_timeseries, df_stats

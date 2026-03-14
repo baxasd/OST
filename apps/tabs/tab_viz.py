@@ -181,26 +181,28 @@ class VisualizerPage(QWidget):
         self.frame_idx = 0
         self.history = {k: [] for k in self.keys}
         
-        # Update UI labels
+        # Update UI labels using your perfectly calculated session.fps
+        actual_fps = session.fps if session.fps > 0 else 30.0
         self.info_vals['lbl_subj'].setText(subj)
         self.info_vals['lbl_act'].setText(act)
-        self.info_vals['lbl_fps'].setText(f"{session.fps:.1f}")
+        self.info_vals['lbl_fps'].setText(f"{actual_fps:.1f}")
         self.info_vals['lbl_frames'].setText(str(len(session.frames)))
         
         self.viz.update_frame(None) 
         
-        # Set the timer speed perfectly to match the recording FPS
-        interval = int(1000 / session.fps) if session.fps > 0 else 33
-        self.timer.setInterval(interval)
+        # 1. Save the interval to the class so it can't be forgotten
+        self.interval_ms = max(1, int(1000.0 / actual_fps))
         
         # Auto-play on load
         self.playing = True
-        self.timer.start()
         
-        # Re-center the 3D camera so the runner is in the middle of the screen
+        # 2. FORCE Qt to use this exact millisecond interval
+        self.timer.start(self.interval_ms)
+        
+        # Re-center the 3D camera
         if session.frames:
             first_frame = session.frames[0]
-            hip = kinematics.get_point(first_frame, "hip_mid")
+            hip = kinematics.get_point(first_frame, "right_hip")
             if hip: 
                 self.viz.center_view(hip[0], -hip[1]) 
             self.viz.update_frame(first_frame)
@@ -209,9 +211,12 @@ class VisualizerPage(QWidget):
         """Play/Pause toggle (also hooked to Spacebar in studio.py)."""
         if not self.is_initialized: return
         self.playing = not self.playing
-        if self.playing: self.timer.start()
-        else: self.timer.stop()
-        
+        if self.playing: 
+            # 3. FORCE Qt to use the exact interval when unpausing
+            self.timer.start(self.interval_ms)
+        else: 
+            self.timer.stop()
+
     def step(self, delta):
         """Moves the playhead forward or backward by one frame."""
         if not self.is_initialized: return
