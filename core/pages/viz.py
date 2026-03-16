@@ -136,7 +136,7 @@ def render():
         with col_skel:
             with st.container(border=True):
                 fig = draw_2d_skeleton(current_frame)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         with col_metrics:
             st.subheader("Frame Metrics")

@@ -66,53 +66,47 @@ def create_kinematic_plot(df, x_col, y_cols, names, colors, title, show_env=Fals
     return fig
 
 def render():
-    col_back, col_title = st.columns([1, 10])
-    with col_back:
-        if st.button("⬅️ Back to Menu", width='stretch'):
-            st.session_state.current_page = "hub"
-            st.rerun()
-    with col_title:
-        st.title("📊 Gait Analysis")
+    st.title("Gait Analysis")
 
     with st.sidebar:
-        st.title("Analysis Controls")
-        st.subheader("DATA SOURCE")
-        analysis_file = st.file_uploader("Upload CLEANED Data (.csv or .parquet)", type=['csv', 'parquet'], key="analysis_uploader")
+        st.title("Controls")
+        analysis_file = st.file_uploader("Select File", type=['csv', 'parquet'], key="analysis_uploader")
         
         df_analysis_raw = None
         if analysis_file is not None:
             if analysis_file.name.endswith('.parquet'): df_analysis_raw = pd.read_parquet(analysis_file)
             else: df_analysis_raw = pd.read_csv(analysis_file)
+    
+        st.subheader("Resampling")
+        grouping = st.selectbox("Choose an option:", ["Frames", "Seconds", "Minutes"], index=1)
+        show_env = st.checkbox("Show Variance Envelopes", value=True)
         
-        st.markdown("---")
-        st.subheader("PLOT CONTROLS")
-        grouping = st.selectbox("Resampling Level:", ["Frames (Raw)", "Seconds (Averaged)", "Minutes (Averaged)"], index=1)
-        show_env = st.checkbox("Show Variance Envelopes (SD)", value=True)
-        
-        st.markdown("---")
-        st.subheader("EXPORT REPORTS")
+        st.subheader("Export")
         if df_analysis_raw is not None:
-            st.caption("Crunching math to enable exports...")
             ts_df, df_per_sec, df_per_min, stats_df = process_analysis_data(df_analysis_raw)
             
             export_df = ts_df if "Frames" in grouping else (df_per_sec if "Seconds" in grouping else df_per_min)
             st.download_button(
-                label=f"📥 Download Timeline Data ({grouping.split(' ')[0]})",
+                label=f"Download Timeline Data - {grouping.split(' ')[0]}",
                 data=export_df.to_csv(index=False).encode('utf-8'),
-                file_name=f"kinematics_timeline_{grouping.split(' ')[0].lower()}.csv",
+                file_name=f"timeseries_{grouping.split(' ')[0].lower()}.csv",
                 mime='text/csv', width='stretch'
             )
             
             st.download_button(
-                label="📥 Download Summary Stats",
+                label="Download Summary",
                 data=stats_df.to_csv(index=True).encode('utf-8'),
-                file_name="kinematics_summary_stats.csv",
+                file_name="summary.csv",
                 mime='text/csv', width='stretch'
             )
+        st.markdown("---")
+        if st.button("Back to Menu", width='stretch'):
+            st.session_state.current_page = "hub"
+            st.rerun()
 
     if df_analysis_raw is not None:
-        with st.expander("METRICS SUMMARY & POSTURAL DRIFT", expanded=True):
-            st.dataframe(stats_df.style.format("{:.2f}"), use_container_width=True, height=250)
+        with st.expander("Metrics Summary", expanded=True):
+            st.dataframe(stats_df.style.format("{:.2f}"), width="stretch", height=250)
 
         if "Frames" in grouping:
             plot_df = ts_df.copy()
@@ -128,7 +122,7 @@ def render():
         # UI THEME CONSTANTS APPLIED HERE
         with st.container(border=True):
             fig_lean = create_kinematic_plot(plot_df, x_col, ['lean_x', 'lean_z'], ["Sagittal (X)", "Frontal (Z)"], [COLOR_RIGHT, COLOR_LEFT], "1. Trunk Lean Dynamics", show_env)
-            st.plotly_chart(fig_lean, use_container_width=True)
+            st.plotly_chart(fig_lean, width="stretch")
 
         plots_config = [
             ("2. Knee Flexion", ['l_knee', 'r_knee'], ["Left Knee", "Right Knee"]),
@@ -142,6 +136,6 @@ def render():
             with cols[i % 2]:
                 with st.container(border=True):
                     fig = create_kinematic_plot(plot_df, x_col, y_cols, names, [COLOR_LEFT, COLOR_RIGHT], title, show_env)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
     else:
-        st.info("👈 Upload your CLEANED dataset from the Data Prep tab to run the analysis.")
+        st.info("Upload preprocessed dataset to run the analysis.")

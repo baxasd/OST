@@ -65,6 +65,6 @@ def render():
             fig.add_trace(go.Scatter(y=st.session_state.clean_df[selected_joint], mode='lines', name='Cleaned Data', line=dict(color=COLOR_CLEAN_DATA, width=PREP_CLEAN_WIDTH)))
             
         fig.update_layout(title=f"Tracking: {selected_joint}", xaxis_title="Frames", yaxis_title="Coordinate Value (Meters)", hovermode="x unified", height=600, margin=dict(l=0, r=0, t=40, b=0))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("Upload data from the left sidebar to begin.")

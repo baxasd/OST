@@ -122,6 +122,6 @@ def render():
             paper_bgcolor='rgba(0,0,0,0)'
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("👈 Upload a raw mmWave Parquet file from the left sidebar to generate the spectrogram.")
