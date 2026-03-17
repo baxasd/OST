@@ -1,4 +1,5 @@
 import streamlit as st
+import configparser
 
 # Import our modular page views
 from core.pages import hub, prep, analysis, radar, viz
@@ -8,45 +9,67 @@ st.set_page_config(page_title="OST Studio", layout="wide", initial_sidebar_state
 
 st.markdown("""
 <style>    
-    /* 2. KILL THE TOP PADDING */
-    .block-container {
-        padding-top: 2rem !important; 
-        padding-bottom: 1rem !important;
-    }
-            
-    [data-testid="stSidebarUserContent"] {
-        padding-top: 0rem !important;
-    }
-    [data-testid="stSidebarHeader"] {
-        padding: 0rem !important;   
-            margin: 0rem; !important
-    }       
-    
-    /* 4. Make sure all native cards stay solid white across the app */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #ffffff;
-    }
+    .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; }       
+    div[data-testid="stVerticalBlockBorderWrapper"] { background-color: #ffffff; }
 </style>
 """, unsafe_allow_html=True)
 
- 
-# ─── APP STATE ROUTER ────────────────────────────────────────────────────────
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = "hub"
+# Load global configuration to fetch the studio password
+config = configparser.ConfigParser(interpolation=None)
+config.read('settings.ini')
+STUDIO_PASS = config.get('Security', 'studio_password', fallback='admin')
 
-# Global data states shared across pages
+# ─── SIMPLE NATIVE AUTH ──────────────────────────────────────────────────────
+def check_password():
+    """Renders a centered login card and verifies the passcode."""
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Hide sidebar during login for a cleaner look
+    st.markdown("""<style>[data-testid="stSidebar"] {display: none;}</style>""", unsafe_allow_html=True)
+
+    # Use columns to force the login card into the center of the screen
+    _, center_col, _ = st.columns([2, 1.5, 2]) 
+    
+    with center_col:
+        with st.container(border=True):
+            st.markdown("<h3 style='text-align: center;'>🔒 OST Studio Login</h3>", unsafe_allow_html=True)
+            st.write("") # Quick spacer
+            
+            pwd = st.text_input("Enter Passcode:", type="password")
+            
+            if pwd == STUDIO_PASS:  
+                st.session_state["password_correct"] = True
+                st.rerun()
+            elif pwd:
+                st.error("Incorrect passcode.")
+    
+    return False
+
+# Stop execution if not authenticated
+if not check_password():
+    st.stop()
+
+
+# ─── SECURE APP ROUTER (Only runs if unlocked) ───────────────────────────────
+with st.sidebar:
+    st.write("👤 **Admin Mode Active**")
+    if st.button("Logout", width="stretch", type="primary"):
+        st.session_state["password_correct"] = False
+        st.rerun()
+    st.markdown("---")
+
+# Initialize States
+if 'current_page' not in st.session_state: st.session_state.current_page = "hub"
 if 'raw_df' not in st.session_state: st.session_state.raw_df = None
 if 'clean_df' not in st.session_state: st.session_state.clean_df = None
 if 'validation_report' not in st.session_state: st.session_state.validation_report = ""
 
-# ─── NAVIGATION ENGINE ───────────────────────────────────────────────────────
-if st.session_state.current_page == "hub":
-    hub.render()
-elif st.session_state.current_page == "prep":
-    prep.render()
-elif st.session_state.current_page == "analysis":
-    analysis.render()
-elif st.session_state.current_page == "radar":
-    radar.render()
-elif st.session_state.current_page == "viz":
-    viz.render()
+# Navigation Engine
+if st.session_state.current_page == "hub": hub.render()
+elif st.session_state.current_page == "prep": prep.render()
+elif st.session_state.current_page == "analysis": analysis.render()
+elif st.session_state.current_page == "radar": radar.render()
+elif st.session_state.current_page == "viz": viz.render()
