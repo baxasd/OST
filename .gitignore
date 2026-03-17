@@ -21,3 +21,6 @@ env/
 # Local Data
 *.csv
 *.bag
+
+# Sensitive Files
+settings.ini

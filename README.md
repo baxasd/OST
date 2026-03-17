@@ -2,83 +2,69 @@
 
 <p align="left"><img src="assets/logo-main-transp.png" alt="OST Suite Logo" width="250"></p>
 
-#### Osteo-Skeletal Tracker
+#### Osteo-Skeletal Tracker & Telemetry
 
-A portable, modular workstation for recording, processing, and visualizing skeletal motion data using Intel RealSense and MediaPipe.
+A high-performance, distributed workstation for recording, processing, and visualizing multi-modal skeletal and micro-Doppler motion data
 
-![Version](https://img.shields.io/badge/version-0.2.2-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 ![Python](https://img.shields.io/badge/python-3.11-green)
+![ZeroMQ](https://img.shields.io/badge/ZeroMQ-Curve25519-red)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10.21-teal)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
 
-## 🛠 Features
+## System Architecture
 
-### 📷 OST Recorder
+OST Suite now utilizes a **Secure Publisher/Subscriber** model via ZeroMQ, allowing the hardware capture node and the visualization node to run independently—either on the same machine or across a local network. 
+All network telemetry is secured via **Curve25519 Elliptic Curve Encryption**.
+---
 
-* Auto-detects Intel RealSense cameras
-* Real-time skeletal overlay (MediaPipe Pose)
-* Depth-aligned 3D coordinate export
+## Features
 
-### 📊 OST Studio
+### OST Publisher (`stream.py`)
+The hardware-interfacing node. Captures and broadcasts data in real-time.
+* **TI mmWave Radar Support:** Auto-detects COM ports and parses raw byte streams into Range-Doppler Heatmaps.
+* **RealSense & MediaPipe:** Captures depth-aligned video and computes 3D skeletal joint coordinates (33 landmarks).
+* **Disk Recording:** Saves synchronized, headless data streams locally (Parquet/JSON + JPEG) while broadcasting.
 
-**Data Prep**
-
-* Auto-repair gaps using interpolation
-* Smooth jittery skeletal data
-
-**Visualizer**
-
-* Interactive skeleton playback
-* Synchronized metric graphs
-
-### 📦 Portable
-
-Runs as a standalone application.
+### OST Viewer (`view.py`)
+The visualization node. Receives and renders telemetry securely.
+* **Live Micro-Doppler Heatmap:** PyQtGraph-powered radar visualization with dynamic noise-floor scaling and custom Jet colormaps.
+* **Live Camera Feed:** Real-time video playback with skeleton overlays.
+* **Network Flexible:** Connects to localhost or external IPs seamlessly.
 
 ---
 
-## 📥 Installation
+## 📥 Installation & Setup
 
-### For Users (Lab Machines)
+### 1. Clone the Repository
 
-1. Download the latest **Release** from the repository sidebar.
-2. Extract the ZIP file.
-3. Open the folder and run **OST Launcher.exe**.
+### 2. Create a Virtual Environment
+
+### 3. Install Dependencies
+
+### 4. Generate Security Keys (First-Time Setup)
+Because OST uses CurveZMQ for encryption, you must generate a pair of cryptographic keys before streaming data.
+```bash
+python keygen.py
+```
+Copy the terminal output and paste it at the bottom of your `settings.ini` file under the `[Security]` block.
 
 ---
 
-### For Developers
+## 🚀 Usage
 
-#### 1. Clone the Repository
+The suite is driven by a central `settings.ini` file. Ensure your radar configuration files and network ports are correctly defined there before running.
 
+### Start the Hardware Node (Publisher)
+Plug in your RealSense camera and TI Radar, then run:
 ```bash
-git clone https://github.com/yourusername/OST-Suite.git
-cd OST-Suite
+python stream.py
 ```
-
-#### 2. Create a Virtual Environment
-
+### Start the Telemetry Dashboard (Viewer)
+Open a new terminal window (or run on a different computer on the same network) and run:
 ```bash
-python -m venv .venv
-.\venv\Scripts\activate
+python view.py
 ```
-
-#### 3. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-#### 4. Run in Development Mode
-
-```bash
-python main.py
-```
-
 ---
-
-## 🏗️ Building From Source
-
-This project uses a custom PyInstaller setup.
