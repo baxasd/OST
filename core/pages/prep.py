@@ -7,7 +7,7 @@ from core.ui.theme import COLOR_RAW_DATA, COLOR_CLEAN_DATA, PREP_RAW_WIDTH, PREP
 
 def render():
 
-    st.header("Data Preparation")
+    st.title("Data Preparation")
 
     with st.sidebar:
         st.markdown("# Controls")

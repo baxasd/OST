@@ -39,15 +39,15 @@ def render():
         
         with r2_c1:
             with st.container(border=True):
-                st.markdown("### Visualizer")
-                st.caption("Scrub perfectly synced 2D kinematics.")
+                st.markdown("### Motion Lab")
+                st.caption("View captured skeleton")
                 if st.button("Launch Module", key="btn_viz", type="primary", width="stretch"):
                     st.session_state.current_page = "viz"
                     st.rerun()
 
         with r2_c2:
             with st.container(border=True):
-                st.markdown("### Radar Analysis")
+                st.markdown("### Spectrogram Analysis")
                 st.caption("Generate Micro-Doppler spectrograms.")
                 if st.button("Launch Module", key="btn_radar", type="primary", width="stretch"):
                     st.session_state.current_page = "radar"

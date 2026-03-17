@@ -4,40 +4,10 @@ import plotly.graph_objects as go
 import io
 
 from core.io import structs
+from core.io.structs import BONES_LIST, VISIBLE_NAMES
 from core.math import kinematics
 from core.ui.theme import COLOR_LEFT, COLOR_RIGHT, COLOR_CENTER, COLOR_JOINT, COLOR_SKELETON_BG, COLOR_REF_LINE, VIZ_BONE_WIDTH, VIZ_SPINE_WIDTH
 
-# ── 1. Skeleton Configuration (From render.py) ──
-VISIBLE_NAMES = [
-    "nose", 
-    "left_shoulder", "right_shoulder",
-    "left_elbow", "right_elbow", 
-    "left_wrist", "right_wrist",
-    "left_hip", "right_hip", 
-    "left_knee", "right_knee", 
-    "left_ankle", "right_ankle",
-    "hip_mid", "shoulder_mid" # Added so the spine dots draw
-]
-
-BONES_LIST = [
-    ("hip_mid", "shoulder_mid"),         # Spine
-    ("hip_mid", "left_hip"),             # Pelvis L
-    ("hip_mid", "right_hip"),            # Pelvis R
-    ("shoulder_mid", "left_shoulder"),   # Clavicle L
-    ("shoulder_mid", "right_shoulder"),  # Clavicle R
-    
-    ("left_shoulder", "left_elbow"),     # Arm L
-    ("left_elbow", "left_wrist"),        # Forearm L
-    ("right_shoulder", "right_elbow"),   # Arm R
-    ("right_elbow", "right_wrist"),      # Forearm R
-    
-    ("left_hip", "left_knee"),           # Thigh L
-    ("left_knee", "left_ankle"),         # Shin L
-    ("right_hip", "right_knee"),         # Thigh R
-    ("right_knee", "right_ankle"),       # Shin R
-    
-    ("shoulder_mid", "nose")             # Neck
-]
 
 @st.cache_data(show_spinner=False)
 def load_session_for_viz(file_bytes, filename):
@@ -102,18 +72,12 @@ def draw_2d_skeleton(frame):
     return fig
 
 def render():
-    col_back, col_title = st.columns([1, 10])
-    with col_back:
-        if st.button("⬅️ Back to Menu", width='stretch'):
-            st.session_state.current_page = "hub"
-            st.rerun()
-    with col_title:
-        st.title("🦴 Precision Frame Inspector")
+
+    st.title("Motion Lab")
 
     with st.sidebar:
-        st.title("Controls")
-        st.subheader("DATA SOURCE")
-        uploaded_file = st.file_uploader("Select Cleaned File (.parquet or .csv)", type=['parquet', 'csv'], key="viz_up")
+        st.markdown("# Controls")
+        uploaded_file = st.file_uploader("Select File (.parquet or .csv)", type=['parquet', 'csv'], key="viz_up")
         
         session = None
         if uploaded_file is not None:
@@ -121,39 +85,59 @@ def render():
                 session = load_session_for_viz(uploaded_file.getvalue(), uploaded_file.name)
             
             st.success(f"Loaded {len(session.frames)} frames.")
-            st.markdown("---")
-            
-            st.subheader("TIMELINE SCRUBBER")
+            st.subheader("Frames")
             max_f = len(session.frames) - 1
             frame_idx = st.slider("Select Frame:", min_value=0, max_value=max_f, value=0, step=1)
             
             current_frame = session.frames[frame_idx]
-            st.caption(f"⏱️ **Timestamp:** {current_frame.timestamp:.2f} seconds")
+            st.caption(f"**Timestamp:** {current_frame.timestamp:.2f} seconds")
+
+        st.markdown("---")
+        if st.button("Back to Menu", width='stretch'):
+            st.session_state.current_page = "hub"
+            st.rerun()
 
     if uploaded_file is not None and session is not None:
-        col_skel, col_metrics = st.columns([2, 1], gap="large")
         
-        with col_skel:
-            with st.container(border=True):
-                fig = draw_2d_skeleton(current_frame)
-                st.plotly_chart(fig, width="stretch")
-
-        with col_metrics:
-            st.subheader("Frame Metrics")
-            st.caption("Instantaneous joint angles for the selected frame.")
-            
-            vals = kinematics.compute_all_metrics(current_frame)
-            
-            metrics_config = [
-                ("**Trunk Lean**", [("Sagittal (Forward)", 'lean_x'), ("Frontal (Side)", 'lean_z')]),
-                ("**Knee Flexion**", [("Left Knee", 'l_knee'), ("Right Knee", 'r_knee')]),
-                ("**Hip Flexion**", [("Left Hip", 'l_hip'), ("Right Hip", 'r_hip')])
-            ]
-            
-            for section_title, metrics in metrics_config:
+        # ─── 1. METRICS SECTION (MOVED TO TOP) ───
+        st.subheader("Frame Metrics")
+        st.caption("Instantaneous joint angles for the selected frame.")
+        
+        vals = kinematics.compute_all_metrics(current_frame)
+        
+        metrics_config = [
+            ("Trunk Lean", [("Sagittal (Forward)", 'lean_x'), ("Frontal (Side)", 'lean_z')]),
+            ("Knee Flexion", [("Left Knee", 'l_knee'), ("Right Knee", 'r_knee')]),
+            ("Hip Flexion", [("Left Hip", 'l_hip'), ("Right Hip", 'r_hip')])
+        ]
+        
+        # Display the 3 metric cards side-by-side
+        metric_cols = st.columns(3)
+        for i, (section_title, metrics) in enumerate(metrics_config):
+            with metric_cols[i]:
                 with st.container(border=True):
-                    st.markdown(section_title)
+                    st.markdown(f"**{section_title}**")
+                    
+                    html_block = ""
                     for label, key in metrics:
-                        st.metric(label, f"{vals[key]:.1f}°")
+                        val_str = f"{vals[key]:.1f}&deg;"
+                        html_block += f"""
+                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(128, 128, 128, 0.2);">
+                            <span>{label}</span>
+                            <strong>{val_str}</strong>
+                        </div>
+                        """
+                    st.markdown(html_block, unsafe_allow_html=True)
+
+        st.write("") # Quick spacer
+
+        # ─── 2. SKELETON SECTION (MOVED BELOW) ───
+        st.subheader("Skeletal Projection")
+        st.caption("2D tracking visualization.")
+        
+        with st.container(border=True):
+            fig = draw_2d_skeleton(current_frame)
+            st.plotly_chart(fig, width="stretch")
+            
     else:
-        st.info("👈 Upload a dataset from the sidebar to inspect frames.")
+        st.info("Upload a dataset to generate motion preview.")

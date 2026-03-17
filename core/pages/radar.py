@@ -44,36 +44,34 @@ def process_radar_data(file_bytes, range_lo, range_hi, smooth_window):
 
 
 def render():
-    col_back, col_title = st.columns([1, 10])
-    with col_back:
-        if st.button("⬅️ Back to Menu", width='stretch'):
-            st.session_state.current_page = "hub"
-            st.rerun()
-    with col_title:
-        st.title("📡 Radar Spectrogram Analysis")
+    
+    st.title("Radar Spectrogram Analysis")
 
     with st.sidebar:
-        st.title("Radar Controls")
+        st.markdown("# Controls")
         
-        st.subheader("DATA SOURCE")
-        uploaded_file = st.file_uploader("Select Parquet File", type=['parquet'], key="radar_up")
+        uploaded_file = st.file_uploader("Select File", type=['parquet'], key="radar_up")
         
-        st.markdown("---")
-        st.subheader("RANGE GATE (Meters)")
+        st.subheader("Range Gate")
         col_lo, col_hi = st.columns(2)
         range_lo = col_lo.number_input("Min Range", min_value=0.0, max_value=49.0, value=0.0, step=0.1)
         range_hi = col_hi.number_input("Max Range", min_value=0.1, max_value=50.0, value=5.0, step=0.1)
         
-        st.markdown("---")
-        st.subheader("VISUALS")
+        st.subheader("Visuals")
         
-        cmap_mapping = {'jet': 'Jet', 'inferno': 'Inferno', 'turbo': 'Turbo', 'viridis': 'Viridis', 'plasma': 'Plasma'}
-        cmap_sel = st.selectbox("Theme:", list(cmap_mapping.keys()), index=0)
+        cmap_mapping = {'Jet': 'Jet', 'Inferno': 'Inferno', 'Plasma': 'Plasma'}
+        cmap_sel = st.selectbox("Colormap:", list(cmap_mapping.keys()), index=0)
         plotly_cmap = cmap_mapping[cmap_sel]
         
         cont_lo, cont_hi = st.slider("Contrast Percentiles:", min_value=0.0, max_value=100.0, value=(40.0, 99.5), step=0.5)
         smooth_win = st.number_input("Smoothing Window:", min_value=1, max_value=10, value=3, step=1)
         show_centroid = st.checkbox("Overlay Cadence Line", value=True)
+        
+        st.markdown("---")
+        
+        if st.button("Back to Menu", width='stretch'):
+            st.session_state.current_page = "hub"
+            st.rerun()
 
     if uploaded_file is not None:
         with st.spinner("Crunching Micro-Doppler FFTs..."):
@@ -81,47 +79,72 @@ def render():
                 uploaded_file.getvalue(), range_lo, range_hi, int(smooth_win)
             )
 
-        st.subheader("Gait Statistics")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Estimated Cadence", f"{spm:.0f} SPM" if spm > 0 else "--")
-        c2.metric("Peak Velocity", f"{peak_v:+.2f} m/s")
-        c3.metric("Mean |Vel|", f"{mean_abs:.2f} m/s")
-        c4.metric("Session", f"{dur:.1f}s ({frames} frames)")
+        # ─── 1. METRICS SECTION (MOVED TO TOP) ───
+        st.subheader("Session Statistics")
+        st.caption("Aggregated gait and motion metrics.")
         
-        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("**Core Metrics**")
+            
+            cadence_str = f"{spm:.0f}" if spm > 0 else "--"
+            metrics_data = [
+                ("Cadence", f"{cadence_str} SPM"),
+                ("Peak Vel", f"{peak_v:+.2f} m/s"),
+                ("Mean |Vel|", f"{mean_abs:.2f} m/s"),
+                ("Duration", f"{dur:.1f} s"),
+                ("FPS", f"{fps:.1f}"),
+                ("Total Frames", f"{int(frames)}")
+            ]
+            
+            html_block = ""
+            for label, val_str in metrics_data:
+                html_block += f"""
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(128, 128, 128, 0.2);">
+                    <span>{label}</span>
+                    <strong>{val_str}</strong>
+                </div>
+                """
+            
+            st.markdown(html_block, unsafe_allow_html=True)
+
+        st.write("") # Quick spacer
+
+        # ─── 2. SPECTROGRAM SECTION (MOVED BELOW) ───
         st.subheader("Micro-Doppler Spectrogram")
+        st.caption("Time-velocity distribution of the target.")
         
-        sub_spec = spec[::4, ::4]
-        z_min = float(np.percentile(sub_spec, cont_lo))
-        z_max = float(np.percentile(sub_spec, cont_hi))
-        if z_min >= z_max: z_max = z_min + 0.1
-        
-        fig = go.Figure()
-        
-        fig.add_trace(go.Heatmap(
-            z=spec.T, x=t_axis, y=v_axis,
-            colorscale=plotly_cmap,
-            zmin=z_min, zmax=z_max,
-            hoverinfo='skip', 
-            showscale=False   
-        ))
+        with st.container(border=True):
+            sub_spec = spec[::4, ::4]
+            z_min = float(np.percentile(sub_spec, cont_lo))
+            z_max = float(np.percentile(sub_spec, cont_hi))
+            if z_min >= z_max: z_max = z_min + 0.1
+            
+            fig = go.Figure()
+            
+            fig.add_trace(go.Heatmap(
+                z=spec.T, x=t_axis, y=v_axis,
+                colorscale=plotly_cmap,
+                zmin=z_min, zmax=z_max,
+                hoverinfo='skip', 
+                showscale=False   
+            ))
 
-        # UI THEME CONSTANTS APPLIED HERE
-        if show_centroid and centroid is not None:
-            fig.add_trace(go.Scatter(x=t_axis, y=centroid, mode='lines', line=dict(color=COLOR_CENTROID_SHADOW, width=4), hoverinfo='skip', showlegend=False))
-            fig.add_trace(go.Scatter(x=t_axis, y=centroid, mode='lines', name='Mass Centroid', line=dict(color=COLOR_CENTROID_MAIN, width=1.5)))
+            if show_centroid and centroid is not None:
+                fig.add_trace(go.Scatter(x=t_axis, y=centroid, mode='lines', line=dict(color=COLOR_CENTROID_SHADOW, width=4), hoverinfo='skip', showlegend=False))
+                fig.add_trace(go.Scatter(x=t_axis, y=centroid, mode='lines', name='Mass Centroid', line=dict(color=COLOR_CENTROID_MAIN, width=1.5),  showlegend=False))
 
-        fig.add_hline(y=0, line_dash="dash", line_color=COLOR_ZERO_LINE, line_width=1)
+            fig.add_hline(y=0, line_dash="dash", line_color=COLOR_ZERO_LINE, line_width=1)
 
-        fig.update_layout(
-            xaxis_title="Time (Seconds)",
-            yaxis_title="Doppler Velocity (m/s)",
-            height=600,
-            margin=dict(l=0, r=0, t=10, b=0),
-            plot_bgcolor=COLOR_RADAR_BG,
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
+            fig.update_layout(
+                xaxis_title="Time (Seconds)",
+                yaxis_title="Doppler Velocity (m/s)",
+                height=600,
+                margin=dict(l=0, r=0, t=10, b=0),
+                plot_bgcolor=COLOR_RADAR_BG,
+                paper_bgcolor='rgba(0,0,0,0)'
+            )
 
-        st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, width="stretch")
+            
     else:
-        st.info("👈 Upload a raw mmWave Parquet file from the left sidebar to generate the spectrogram.")
+        st.info("Upload a dataset to generate spectrogram.")

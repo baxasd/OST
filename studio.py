@@ -12,7 +12,7 @@ st.markdown("""
     .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarHeader"] { padding: 0rem !important; margin: 0rem !important; }       
-    div[data-testid="stVerticalBlockBorderWrapper"] { background-color: #ffffff; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -21,7 +21,7 @@ config = configparser.ConfigParser(interpolation=None)
 config.read('settings.ini')
 STUDIO_PASS = config.get('Security', 'studio_password', fallback='admin')
 
-# ─── SIMPLE NATIVE AUTH ──────────────────────────────────────────────────────
+# Auth
 def check_password():
     """Renders a centered login card and verifies the passcode."""
     if st.session_state.get("password_correct", False):
@@ -55,11 +55,7 @@ if not check_password():
 
 # ─── SECURE APP ROUTER (Only runs if unlocked) ───────────────────────────────
 with st.sidebar:
-    st.write("👤 **Admin Mode Active**")
-    if st.button("Logout", width="stretch", type="primary"):
-        st.session_state["password_correct"] = False
-        st.rerun()
-    st.markdown("---")
+    st.image("assets/logo-main-transp.png", width=150)
 
 # Initialize States
 if 'current_page' not in st.session_state: st.session_state.current_page = "hub"

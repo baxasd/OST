@@ -1,18 +1,18 @@
 [theme]
 # The primary accent color for interactive elements (e.g., Primary Buttons, Sliders)
-primaryColor = "#008080"
+primaryColor = "#0A8491"
 
 # The base theme. Options: "light" or "dark"
 base = "light"
 
 # The main background color of the app
-backgroundColor = "#FFFFFF"
+backgroundColor = "#F4F6F9"
 
 # The background color for the sidebar and st.container(border=True)
-secondaryBackgroundColor = "#F3F2F1"
+secondaryBackgroundColor = "#E8EEF2"
 
 # The global text color
-textColor = "#323130"
+textColor = "#1E293B"
 
 # The global font family. Options: "sans serif", "serif", "monospace"
 font = "sans serif"

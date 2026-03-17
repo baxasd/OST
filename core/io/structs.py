@@ -18,6 +18,38 @@ POSE_LANDMARKS = {
     32: "right_foot_index"
 }
 
+# ── 1. Skeleton Configuration (From render.py) ──
+VISIBLE_NAMES = [
+    "nose", 
+    "left_shoulder", "right_shoulder",
+    "left_elbow", "right_elbow", 
+    "left_wrist", "right_wrist",
+    "left_hip", "right_hip", 
+    "left_knee", "right_knee", 
+    "left_ankle", "right_ankle",
+    "hip_mid", "shoulder_mid" # Added so the spine dots draw
+]
+
+BONES_LIST = [
+    ("hip_mid", "shoulder_mid"),         # Spine
+    ("hip_mid", "left_hip"),             # Pelvis L
+    ("hip_mid", "right_hip"),            # Pelvis R
+    ("shoulder_mid", "left_shoulder"),   # Clavicle L
+    ("shoulder_mid", "right_shoulder"),  # Clavicle R
+    
+    ("left_shoulder", "left_elbow"),     # Arm L
+    ("left_elbow", "left_wrist"),        # Forearm L
+    ("right_shoulder", "right_elbow"),   # Arm R
+    ("right_elbow", "right_wrist"),      # Forearm R
+    
+    ("left_hip", "left_knee"),           # Thigh L
+    ("left_knee", "left_ankle"),         # Shin L
+    ("right_hip", "right_knee"),         # Thigh R
+    ("right_knee", "right_ankle"),       # Shin R
+    
+    ("shoulder_mid", "nose")             # Neck
+]
+
 NAME_TO_ID = {v: k for k, v in POSE_LANDMARKS.items()}
 
 def identify_joint_columns(columns: List[str]) -> List[str]:
