@@ -55,9 +55,7 @@ def connect_radar():
     radar.connect_and_configure()
     
     # Print a nice summary of the radar parameters to the console
-    print("\n" + "="*40)
-    print(" RADAR CONFIGURATION LOADED")
-    print("="*40)
+    print("Radar Configuration")
     for key, value in radar.config.summary().items():
         print(f" {key:<20}: {value}")
     print("="*40 + "\n")

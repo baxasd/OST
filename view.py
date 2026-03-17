@@ -8,21 +8,17 @@ import pyqtgraph as pg
 import configparser
 
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
-                            QLabel, QStackedWidget)
-from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QLabel
+from PyQt6.QtGui import QPixmap
 
-# Pulling in custom settings from your new enterprise architecture
 from core.radar.parser import RadarConfig
-from core.ui.theme import * 
+from core.ui.theme import COLOR_MAIN_BG, COLOR_TEXT 
 
-# Setup a logger so errors print cleanly to the terminal
+# Basic logger for terminal feedback
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
-log = logging.getLogger("Subscriber")
+log = logging.getLogger("Viewer")
 
-# ── 1. Load Global Settings ──────────────────────────────────────────────────
-# We read settings.ini here so if you ever change your network ports or UI colors,
-# you don't have to hunt through Python code to fix it.
+# Pull settings from the ini file so we don't hardcode network/hardware details
 config = configparser.ConfigParser()
 config.read('settings.ini')
 
@@ -37,15 +33,9 @@ DISP_LOW_PCT    = float(config['Viewer']['low_pct'])
 DISP_HIGH_PCT   = float(config['Viewer']['high_pct'])
 SMOOTH_GRID     = int(config['Viewer']['smooth_grid_size'])
 
-# ── 2. Background Network Threads ─────────────────────────────────────────────
-
 class ZmqRadarWorker(QThread):
-    """
-    Background worker that constantly listens to Port 5555 for Radar bytes.
-    It does the heavy math (FFT, decibel conversion, resizing) so the UI doesn't lag.
-    """
-    # Signals are how background threads safely talk to the UI thread.
-    new_frame = pyqtSignal(np.ndarray, float, float) # Sends (Image Matrix, Dark_Limit, Light_Limit)
+    """Listens to the radar ZMQ socket and pre-processes the raw bytes before sending to UI."""
+    new_frame = pyqtSignal(np.ndarray, float, float) 
     error     = pyqtSignal(str)
 
     def __init__(self, cfg: RadarConfig, publisher_ip: str, zoom_y: float, zoom_x: float):
@@ -55,66 +45,57 @@ class ZmqRadarWorker(QThread):
         self.zoom_y = zoom_y
         self.zoom_x = zoom_x
         
-        # Calculate exactly how many bytes we expect in a single frame
+        # Calc the expected payload size based on the radar profile
         self.num_range_bins = cfg.numRangeBins
         self.num_vel_bins   = cfg.numLoops
         self.max_bin = min(int(MAX_RANGE / cfg.rangeRes), cfg.numRangeBins)
         self._expected_size = self.num_range_bins * self.num_vel_bins
 
-        # Setup the ZeroMQ Subscriber socket
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect(f"tcp://{publisher_ip}:{ZMQ_RADAR_PORT}")
-        self.socket.setsockopt_string(zmq.SUBSCRIBE, "") # Empty string means "Subscribe to ALL messages"
+        self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
     def run(self):
-        """This loop runs infinitely in the background until the app is closed."""
         while self.running:
             try:
-                # poll(100) puts the thread to sleep for up to 100ms. 
-                # If a message arrives, it wakes up instantly. This saves massive CPU usage.
+                # Sleep briefly if no data is available to prevent maxing out the CPU
                 if self.socket.poll(100) == 0:
                     continue 
 
-                # Grab the bytes and convert them to a 1D Numpy Array
                 msg = self.socket.recv(flags=zmq.NOBLOCK)
                 raw = np.frombuffer(msg, dtype=np.uint16)
                 
-                # Drop corrupted packets
+                # Drop malformed packets
                 if raw.size != self._expected_size: continue
 
-                # Reshape to 2D, chop off the distant ranges we don't care about, and convert to Decibels
+                # Reshape, clip to max range, and convert to dB
                 rd = raw.astype(np.float32).reshape(self.num_range_bins, self.num_vel_bins)
                 rd = rd[:self.max_bin, :]
                 display = 20.0 * np.log10(np.abs(np.fft.fftshift(rd, axes=1)) + 1e-6)
                 
-                # Smooth the image out to make it look nicer
+                # Upscale the image for a smoother heatmap
                 smooth = ndimage.zoom(display, (self.zoom_y, self.zoom_x), order=1)
                 
-                # Calculate exactly where the noise floor (black) and peak values (white/red) are
+                # Calc dynamic color limits based on percentiles
                 lo = float(np.percentile(smooth, DISP_LOW_PCT))
                 hi = float(np.percentile(smooth, DISP_HIGH_PCT))
                 if lo >= hi: hi = lo + 0.1
 
-                # Ship the finished product back to the Main UI Thread
                 self.new_frame.emit(smooth, lo, hi)
                 
             except Exception as e:
                 self.error.emit(str(e))
 
     def stop(self):
-        """Safely shuts down the network socket when the user closes the window."""
+        """Cleanly kill the ZMQ context on exit."""
         self.running = False
         self.wait()
         self.socket.close()
         self.context.term()
 
-
 class ZmqCameraWorker(QThread):
-    """
-    Background worker listening to Port 5556 for the Camera stream.
-    Expects a multipart message: [JSON Data, JPEG Bytes].
-    """
+    """Listens to the camera ZMQ socket for JSON metadata and JPEG bytes."""
     new_frame = pyqtSignal(dict, bytes)
     error     = pyqtSignal(str)
 
@@ -132,13 +113,11 @@ class ZmqCameraWorker(QThread):
                 if self.socket.poll(100) == 0:
                     continue
 
-                # Unpack the two parts of the message
+                # Unpack the multipart message
                 msg_parts = self.socket.recv_multipart(flags=zmq.NOBLOCK)
                 if len(msg_parts) == 2:
                     meta_dict = json.loads(msg_parts[0].decode('utf-8'))
                     img_bytes = msg_parts[1]
-                    
-                    # Ship it to the UI
                     self.new_frame.emit(meta_dict, img_bytes)
                     
             except Exception as e:
@@ -150,31 +129,39 @@ class ZmqCameraWorker(QThread):
         self.socket.close()
         self.context.term()
 
-# ── 3. Main Window UI ────────────────────────────────────────────────────────
 class LiveViewerWindow(QMainWindow):
+    """Main UI Window."""
     def __init__(self, cfg: RadarConfig, publisher_ip: str):
         super().__init__()
         self.cfg = cfg
         self.publisher_ip = publisher_ip
         
-        # Track whether we've received the first frame yet
-        self.radar_active = False
-        self.cam_active = False
-        
         self.zoom_y = 1.0
         self.zoom_x = 1.0
 
-        self.setWindowTitle(f"OST Live Telemetry | Connected to: {self.publisher_ip}")
-        self.resize(1400, 700)
-        self.setStyleSheet(CSS_MAIN_WINDOW)
+        self.setWindowTitle(f"OST Live Telemetry | {self.publisher_ip}")
+        self.setFixedSize(960, 400) # Lock size to maintain aspect ratios
 
-        # Precompute the math before the UI boots
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {COLOR_MAIN_BG};
+            }}
+            #CamFeed {{
+                background-color: transparent; 
+                border: none;
+            }}
+        """)
+
+        # Cache axis limits
+        self.max_range_val = min(int(MAX_RANGE / self.cfg.rangeRes), self.cfg.numRangeBins) * self.cfg.rangeRes
+        self.dop_max = self.cfg.dopMax
+        
         self._precompute_zoom() 
         self._build_ui()
         self._start_workers()
 
     def _precompute_zoom(self):
-        """Calculates the scaling factors needed to make the radar blocky-pixels look smooth."""
+        """Calc scaling factors based on target grid size."""
         src_rows = min(int(MAX_RANGE / self.cfg.rangeRes), self.cfg.numRangeBins)
         src_cols = self.cfg.numLoops
         self.zoom_y = max(SMOOTH_GRID, src_rows) / src_rows
@@ -184,68 +171,52 @@ class LiveViewerWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         
-        # A horizontal layout splits the window left-to-right
         main_layout = QHBoxLayout(central)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20) 
+        main_layout.setContentsMargins(10, 10, 10, 10) 
+        main_layout.setSpacing(10) 
         
-        # ── Left Side: Radar Stack ──
-        # A StackedWidget lets us put elements "on top" of each other. 
-        self.radar_stack = QStackedWidget()
+        # ── Left Side: Radar Plot ──
+        self.plot_radar = pg.PlotWidget()
+        self.plot_radar.setBackground(COLOR_MAIN_BG)
+        self.plot_radar.setTitle(None)
         
-        # Layer 0: The "Waiting" message
-        self.lbl_wait_radar = QLabel(f"Waiting for Radar Stream...\n(Listening on Port {ZMQ_RADAR_PORT})")
-        self.lbl_wait_radar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_wait_radar.setFont(QFont("Segoe UI", 12))
-        self.lbl_wait_radar.setStyleSheet(f"color: {TEXT_DIM}; background-color: {BG_PANEL}; border-radius: 8px;")
+        # Style Axes
+        styles = {'color': COLOR_TEXT, 'font-size': '12px', 'font-family': 'Segoe UI'}
+        self.plot_radar.setLabel("left", "Range", units="m", **styles)
+        self.plot_radar.setLabel("bottom", "Velocity", units="m/s", **styles)
         
-        # Layer 1: The actual PyQtGraph Plot
-        self.plot_radar = pg.PlotWidget(title="Live Micro-Doppler Heatmap")
-        self.plot_radar.setLabel("left", "Range", units="m", color=TEXT_DIM)
-        self.plot_radar.setLabel("bottom", "Velocity", units="m/s", color=TEXT_DIM)
-        self.plot_radar.showGrid(x=True, y=True, alpha=0.3)
-        self.plot_radar.setBackground(BG_PANEL)
+        # Open up the graph by dropping top/right bounds
+        self.plot_radar.getPlotItem().hideAxis('top')
+        self.plot_radar.getPlotItem().hideAxis('right')
         
-        # Adds a dotted center-line at Velocity = 0
-        self.plot_radar.addItem(pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen(TEXT_DIM, style=Qt.PenStyle.DashLine, width=1)))
-
+        pen = pg.mkPen(color=COLOR_TEXT, width=1)
+        self.plot_radar.getAxis('left').setPen(pen)
+        self.plot_radar.getAxis('left').setTextPen(COLOR_TEXT)
+        self.plot_radar.getAxis('bottom').setPen(pen)
+        self.plot_radar.getAxis('bottom').setTextPen(COLOR_TEXT)
+        
+        self.plot_radar.showGrid(x=True, y=True, alpha=0.2) 
+        
+        # Radar Image Layer
         self.img_radar = pg.ImageItem()
         self.img_radar.setColorMap(pg.colormap.get(CMAP))
         self.plot_radar.addItem(self.img_radar)
-
-        # Scale the image coordinates to actual meters and m/s
-        max_bin = min(int(MAX_RANGE / self.cfg.rangeRes), self.cfg.numRangeBins)
-        self._rect = pg.QtCore.QRectF(-self.cfg.dopMax - self.cfg.dopRes / 2.0, 0, self.cfg.dopMax * 2.0, max_bin * self.cfg.rangeRes)
-        self.img_radar.setRect(self._rect)
-
-        self.radar_stack.addWidget(self.lbl_wait_radar) # Index 0
-        self.radar_stack.addWidget(self.plot_radar)     # Index 1
         
-        # stretch=1 enforces that this takes exactly 50% of the screen width
-        main_layout.addWidget(self.radar_stack, stretch=1)
+        # Lock axes down
+        self.plot_radar.setXRange(-self.dop_max, self.dop_max, padding=0)
+        self.plot_radar.setYRange(0, self.max_range_val, padding=0)
+        
+        main_layout.addWidget(self.plot_radar, stretch=1)
 
-        # ── Right Side: Camera Stack ──
-        self.cam_stack = QStackedWidget()
-        
-        # Layer 0: The "Waiting" message
-        self.lbl_wait_cam = QLabel(f"Waiting for Camera Video Stream...\n(Listening on Port {ZMQ_CAM_PORT})")
-        self.lbl_wait_cam.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_wait_cam.setFont(QFont("Segoe UI", 12))
-        self.lbl_wait_cam.setStyleSheet(f"color: {TEXT_DIM}; background-color: {BG_PANEL}; border-radius: 8px;")
-        
-        # Layer 1: A simple label that we will aggressively paint JPEG images onto
+        # ── Right Side: Camera Feed ──
         self.lbl_cam_feed = QLabel()
-        self.lbl_cam_feed.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_cam_feed.setStyleSheet(f"background-color: {BG_PANEL}; border-radius: 8px;")
+        self.lbl_cam_feed.setObjectName("CamFeed") 
+        # Pin to top to prevent vertical floating
+        self.lbl_cam_feed.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         
-        self.cam_stack.addWidget(self.lbl_wait_cam)   # Index 0
-        self.cam_stack.addWidget(self.lbl_cam_feed)  # Index 1
-        
-        # stretch=1 enforces that this takes exactly 50% of the screen width
-        main_layout.addWidget(self.cam_stack, stretch=1)
+        main_layout.addWidget(self.lbl_cam_feed, stretch=1)
 
     def _start_workers(self):
-        """Boots up the background threads and connects their signals to the UI functions."""
         self.w_radar = ZmqRadarWorker(self.cfg, self.publisher_ip, self.zoom_y, self.zoom_x)
         self.w_radar.new_frame.connect(self._on_radar_frame)
         self.w_radar.start()
@@ -255,74 +226,46 @@ class LiveViewerWindow(QMainWindow):
         self.w_cam.start()
 
     def _on_radar_frame(self, smooth_matrix: np.ndarray, lo: float, hi: float):
-        """Triggered by the radar worker. Fast, light UI update."""
-        if not self.radar_active:
-            # First frame arrived! Flip the stacked widget from Layer 0 to Layer 1
-            self.radar_stack.setCurrentIndex(1)
-            self.radar_active = True
-
+        """Update heatmap pixels and force axis re-alignment."""
         self.img_radar.setImage(smooth_matrix, autoLevels=False, levels=(lo, hi))
+        align_rect = pg.QtCore.QRectF(
+            -self.dop_max,         
+            0,                     
+            self.dop_max * 2.0,    
+            self.max_range_val     
+        )
+        self.img_radar.setRect(align_rect)
 
     def _on_cam_frame(self, meta: dict, img_bytes: bytes):
-        """Triggered by the camera worker. Fast JPEG rendering."""
-        if not self.cam_active:
-            # First frame arrived! Flip the stacked widget from Layer 0 to Layer 1
-            self.cam_stack.setCurrentIndex(1)
-            self.cam_active = True
-
-        # Load the JPEG bytes into a standard Qt picture map
+        """Convert jpeg bytes to Pixmap and scale to fit label."""
         pixmap = QPixmap()
         pixmap.loadFromData(img_bytes)
         
-        # Dynamically scale the image to fit the right half of the window, preserving the aspect ratio
         lbl_w = self.lbl_cam_feed.width()
         lbl_h = self.lbl_cam_feed.height()
         if lbl_w > 0 and lbl_h > 0:
             self.lbl_cam_feed.setPixmap(pixmap.scaled(lbl_w, lbl_h, Qt.AspectRatioMode.KeepAspectRatio))
 
     def closeEvent(self, event):
-        """Ensures the background threads die gracefully when the user hits the red 'X' button."""
-        log.info("Closing viewer and safely killing ZMQ connections...")
+        log.info("SHUTTING DOWN...")
         self.w_radar.stop()
         self.w_cam.stop()
         event.accept()
 
-# ── 4. Bootstrapper ──────────────────────────────────────────────────────────
 def main():
-    """CLI Menu that asks for the IP address before booting the UI."""
-    print("=========================================")
-    print("        OST LIVE TELEMETRY VIEWER       ")
-    print("=========================================")
-
-    while True:
-        print("\nCONNECTION MENU:")
-        print(f"  1. Connect to Localhost ({VIEW_IP})")
-        print("  2. Connect to External IP")
-        print("  3. Exit")
-        
-        print("\nSelect an option (1-3): ", end="", flush=True)
-        choice = input().strip()
-        
-        if choice in ['1', '2']:
-            # Determine the IP address
-            ip = VIEW_IP if choice == '1' else input("Enter Publisher IP: ").strip()
-            if not ip: continue
+    ip_input = input(f"\nEnter Stream IP. Leave blank for localhost: ").strip()
+    ip = VIEW_IP if not ip_input else ip_input
             
-            # Boot PyQt6
-            app = QApplication.instance() or QApplication(sys.argv)
-            pg.setConfigOptions(imageAxisOrder="row-major", antialias=True)
-            
-            try:
-                # Read the Radar Configuration file so we know how to plot the axes
-                cfg = RadarConfig(HW_CFG_FILE)
-                window = LiveViewerWindow(cfg, ip)
-                window.show()
-                app.exec()
-            except Exception as e:
-                log.error(f"Failed to initialize: {e}")
-                
-        elif choice == '3':
-            break
+    app = QApplication.instance() or QApplication(sys.argv)
+    pg.setConfigOptions(imageAxisOrder="row-major", antialias=True)
+    
+    try:
+        cfg = RadarConfig(HW_CFG_FILE)
+        window = LiveViewerWindow(cfg, ip)
+        window.show()
+        app.exec()
+    except Exception as e:
+        log.error(f"Failed to initialize: {e}")
 
 if __name__ == "__main__":
     main()

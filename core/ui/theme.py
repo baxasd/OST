@@ -25,3 +25,9 @@ COLOR_RADAR_BG = "rgba(0,0,0,1)"             # Pure black background for spectro
 COLOR_CENTROID_MAIN = "#00E5FF"              # Cyan line for mass centroid
 COLOR_CENTROID_SHADOW = "black"              # Drop shadow to make the cyan pop
 COLOR_ZERO_LINE = "rgba(255, 255, 255, 0.4)" # Faint white dashed line at 0 m/s
+
+TEXT_DIM = "#888888"                         # Dim gray for text labels
+
+# ── CLEAN UI CONSTANTS ───────────────────────────────────────────────────────
+COLOR_MAIN_BG  = "#FFFFFF"  # Pure white background
+COLOR_TEXT     = "#333333"  # Crisp dark gray text
