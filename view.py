@@ -10,10 +10,10 @@ import configparser
 
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QIcon
 
 from core.radar.parser import RadarConfig
-from core.ui.theme import COLOR_MAIN_BG, COLOR_TEXT, APP_VERSION
+from core.ui.theme import COLOR_MAIN_BG, COLOR_TEXT, APP_VERSION, ICON_PATH
 
 # Setup terminal logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
@@ -160,6 +160,7 @@ class LiveViewerWindow(QMainWindow):
 
         self.setWindowTitle(f"OST Live Telemetry | {self.publisher_ip} (Encrypted)")
         self.setFixedSize(960, 400) 
+        self.setWindowIcon(QIcon(ICON_PATH))
 
         self.setStyleSheet(f"""
             QMainWindow {{ background-color: {COLOR_MAIN_BG}; }}

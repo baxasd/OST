@@ -17,3 +17,5 @@ headless = true
 runOnSave = false
 address = "localhost"
 showEmailPrompt = false
+enableCORS = false
+enableXsrfProtection = false

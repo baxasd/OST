@@ -33,7 +33,13 @@ if __name__ == "__main__":
         
     elif choice == '2':
         # Tell Streamlit to run the studio.py file headlessly
-        sys.argv = ["streamlit", "run", "core/studio/studio.py"]
+        sys.argv = [
+            "streamlit", 
+            "run", 
+            "core/studio/studio.py", 
+            "--global.developmentMode=false", 
+            "--logger.level=error"
+        ]
         
         # Schedule the browser to open
         Timer(2.5, open_browser).start()

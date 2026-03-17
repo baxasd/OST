@@ -5,9 +5,11 @@ from PyInstaller.utils.hooks import collect_all, copy_metadata
 project_root = os.path.abspath(os.path.join(SPECPATH, '..')) #type: ignore
 sys.path.insert(0, project_root)
 
-from core.ui.theme import ICON, COMMAND_ICON 
+ICON =  os.path.join(project_root, 'assets', 'icon.ico')
+COMMAND_ICON = os.path.join(project_root, 'assets', 'command.ico')
 
 MANIFEST = os.path.join(project_root, 'ops', 'manifest.xml')
+FIX = os.path.join(project_root, 'ops', 'dllFix.py')
 block_cipher = None
 
 mp_datas, mp_binaries, mp_hidden = collect_all('mediapipe')
@@ -32,8 +34,8 @@ a_stream = Analysis( #type: ignore
     [os.path.join(project_root, 'stream.py')],
     pathex=[project_root],
     datas=shared_datas + mp_datas + rs_datas + cv_datas,
-    hiddenimports=base_hidden + ['sensors'],
-    runtime_hooks=[], 
+    hiddenimports=base_hidden + ['sensors', 'mediapipe'],
+    runtime_hooks=[FIX], 
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

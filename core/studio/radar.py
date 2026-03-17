@@ -23,7 +23,7 @@ def process_radar_data(file_bytes, range_lo, range_hi, smooth_window):
     try:
         cfg_ini = configparser.ConfigParser()
         cfg_ini.read('settings.ini')
-        hw_cfg_file = cfg_ini.get('Hardware', 'radar_cfg_file', fallback='settings.json')
+        hw_cfg_file = cfg_ini.get('Hardware', 'radar_cfg_file')
         
         try:
             radar_cfg = RadarConfig(hw_cfg_file)
@@ -75,6 +75,7 @@ def render():
 
     if uploaded_file is not None:
         with st.spinner("Crunching Micro-Doppler FFTs..."):
+            
             spec, t_axis, v_axis, centroid, peak_v, mean_abs, spm, dur, frames, fps, res = process_radar_data(
                 uploaded_file.getvalue(), range_lo, range_hi, int(smooth_win)
             )
