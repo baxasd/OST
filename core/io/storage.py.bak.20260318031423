@@ -33,12 +33,6 @@ class CameraSessionWriter:
     """
 
     def __init__(self, metadata=None):
-        """
-        Initializes the CameraSessionWriter.
-
-        Args:
-            metadata (dict, optional): Additional metadata to store in the Parquet file. Defaults to None.
-        """
         os.makedirs("records", exist_ok=True)
         self.metadata = metadata or {}
 
@@ -57,12 +51,7 @@ class CameraSessionWriter:
             self.schema_columns.extend([f"j{i}_x", f"j{i}_y", f"j{i}_z"])
 
     def write_frame(self, frame_data: dict):
-        """
-        Called 30 times a second by the publisher stream.
-
-        Args:
-            frame_data (dict): Dictionary containing the frame data.
-        """
+        """Called 30 times a second by the publisher stream."""
         self.data_buffer.append(frame_data)
         self.total_frames += 1
 
@@ -71,9 +60,7 @@ class CameraSessionWriter:
             self._flush_buffer()
 
     def _flush_buffer(self):
-        """
-        Converts the RAM buffer into a Parquet table and writes to disk.
-        """
+        """Converts the RAM buffer into a Parquet table and writes to disk."""
         if not self.data_buffer:
             return
 
@@ -101,9 +88,7 @@ class CameraSessionWriter:
         self.data_buffer.clear()
 
     def close(self):
-        """
-        Called when the user stops the recording. Ensures the final few frames are saved.
-        """
+        """Called when the user stops the recording. Ensures the final few frames are saved."""
         self._flush_buffer()
         if self.writer:
             self.writer.close()
@@ -129,20 +114,12 @@ class RadarSessionWriter:
     """
 
     def __init__(self, metadata=None):
-        """
-        Initializes the RadarSessionWriter.
-
-        Args:
-            metadata (dict, optional): Additional metadata to store in the Parquet file. Defaults to None.
-        """
         os.makedirs("records", exist_ok=True)
+        self.start_time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.filepath = f"records/radar_session_{self.start_time_str}.parquet"
+
         self.metadata = metadata or {}
-        self.metadata["session_start"] = datetime.datetime.now().strftime(
-            "%Y%m%d_%H%M%S"
-        )
-        self.filepath = (
-            f"records/radar_session_{self.metadata['session_start']}.parquet"
-        )
+        self.metadata["session_start"] = self.start_time_str
 
         self.data_buffer = []
         self.chunk_size = CHUNK_SIZE
@@ -151,12 +128,7 @@ class RadarSessionWriter:
         self.schema_columns = ["timestamp", "rdhm_bytes"]
 
     def write_frame(self, rdhm_array: np.ndarray):
-        """
-        Saves the current timestamp and the raw bytes of the radar matrix.
-
-        Args:
-            rdhm_array (np.ndarray): The raw bytes of the radar matrix.
-        """
+        """Saves the current timestamp and the raw bytes of the radar matrix."""
         self.data_buffer.append(
             {"timestamp": time.time(), "rdhm_bytes": rdhm_array.tobytes()}
         )
@@ -165,9 +137,6 @@ class RadarSessionWriter:
             self._flush_buffer()
 
     def _flush_buffer(self):
-        """
-        Converts the RAM buffer into a Parquet table and writes to disk.
-        """
         if not self.data_buffer:
             return
         df = pd.DataFrame(self.data_buffer, columns=self.schema_columns)
@@ -184,9 +153,6 @@ class RadarSessionWriter:
         self.data_buffer.clear()
 
     def close(self):
-        """
-        Called when the user stops the recording. Ensures the final few frames are saved.
-        """
         self._flush_buffer()
         if self.writer:
             self.writer.close()
