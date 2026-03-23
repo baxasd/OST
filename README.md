@@ -6,11 +6,11 @@
 
 OST Suite is a high-performance, distributed workstation for recording, processing, and visualizing multi-modal skeletal kinematics and micro-Doppler radar data. 
 
-![Version](https://img.shields.io/badge/version-0.3.0--beta.1-orange)
+![Version](https://img.shields.io/badge/version-0.3.1--beta.1-orange)
 ![Python](https://img.shields.io/badge/python-3.11-green)
 ![ZeroMQ](https://img.shields.io/badge/ZeroMQ-Curve25519-red)
 
-> **⚠️ Beta Release:** Version 0.3.0-beta.1 introduces standalone `.exe` packaging. Please report any bugs or errors in the Issues tab.
+> **⚠️ Beta Release:** Version 0.3.1-beta.1 introduces standalone `.exe` packaging. Please report any bugs or errors in the Issues tab.
 
 ---
 
@@ -30,8 +30,7 @@ The offline analysis laboratory. A specialized workbench for post-processing rec
 ## Quick Start (Standalone Beta)
 
 1. **Download:** Get the latest release `.zip` and extract it.
-2. **Configure:** Rename `settings-template.ini` to `settings.ini` inside libs directory.
-3. **Security Keys:** Run the Keygen tool through `Studio.exe` to generate Curve25519 keys. Paste the output into your `settings.ini`.
+2. **Configure:** Run keygen.py to generate `settings.ini` file which is required for programs to launch.
 4. **Launch:** Launch modules
 
 ---
@@ -52,8 +51,7 @@ If you prefer to run from source code:
 
 1. Clone the repository and create a Python 3.11 virtual environment.
 2. `pip install -r requirements.txt`
-3. Generate keys: `python core/studio/keys.py`
-4. Setup `settings.ini` as described at the beginning of this file
+3. Generate keys: `python keygen.py`
 4. Run modules directly
 
 ## ⚙️ Supported Hardware

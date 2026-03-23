@@ -131,6 +131,39 @@ exe_stu = EXE( #type: ignore
 
 
 # =============================================================================
+#   BUILD 4: KEYGEN
+# =============================================================================
+a_keygen = Analysis( #type: ignore
+    [os.path.join(project_root, 'keys.py')],
+    pathex=[project_root],
+    datas=[], # No special data needed for keygen
+    hiddenimports=['configparser'],
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+pyz_keygen = PYZ(a_keygen.pure, a_keygen.zipped_data, cipher=block_cipher) #type: ignore
+
+exe_keygen = EXE( #type: ignore
+    pyz_keygen,
+    a_keygen.scripts,
+    [],
+    exclude_binaries=True,
+    name='Keygen',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    icon=COMMAND_ICON,
+    manifest=MANIFEST if os.path.exists(MANIFEST) else None,
+    contents_directory='libs'
+)
+
+# =============================================================================
 #   FINAL MERGE & ORGANIZE
 # =============================================================================
 coll = COLLECT( #type: ignore
@@ -148,6 +181,11 @@ coll = COLLECT( #type: ignore
     a_stu.binaries,
     a_stu.zipfiles,
     a_stu.datas,
+
+    exe_keygen,
+    a_keygen.binaries,
+    a_keygen.zipfiles,
+    a_keygen.datas,
     
     strip=False,
     upx=True,

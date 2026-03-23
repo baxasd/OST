@@ -34,3 +34,9 @@
 - Added unified CLI launcher
 - Centralized UI themes and configurations
 - Secured network settings to local access only
+
+## 0.3.1-beta.1
+
+- Separated Secure Key generation
+- Now the settings scope has been changed to root level
+- Settings.ini file now can be generated automatically 

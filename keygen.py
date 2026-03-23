@@ -13,7 +13,7 @@ def run():
     print("*******************************")
     studio_pass = input("Enter a new password for OST Studio: ")
 
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=None)
     settings_file = 'settings.ini'
 
     # 1. Define all default settings

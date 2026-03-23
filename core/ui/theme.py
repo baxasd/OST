@@ -59,5 +59,5 @@ config = configparser.ConfigParser(interpolation=None)
 config.read(SETTINGS_PATH)
 
 # Export our global variables
-APP_VERSION = "v0.3.0-beta.1"
+APP_VERSION = "v0.3.1-beta.1"
 STUDIO_PASS = config.get('Security', 'studio_password', fallback='admin')
