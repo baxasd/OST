@@ -41,13 +41,15 @@ COLOR_TEXT     = "#333333"  # Crisp dark gray text
 if getattr(sys, 'frozen', False):
     # PyInstaller put everything inside the 'libs' folder!
     ROOT_DIR = os.path.join(sys._MEIPASS)
+    
+    # Safely construct absolute paths
+    SETTINGS_PATH = os.path.join('..', ROOT_DIR, 'settings.ini')
 else:
     # If running from source (core/ui/themes.py), go up two levels to reach root
     _current_dir = os.path.dirname(os.path.abspath(__file__))
     ROOT_DIR = os.path.abspath(os.path.join(_current_dir, '..', '..'))
-
-# Safely construct absolute paths
-SETTINGS_PATH = os.path.join(ROOT_DIR, 'settings.ini')
+    # Safely construct absolute paths
+    SETTINGS_PATH = os.path.join(ROOT_DIR, 'settings.ini')
 LOGO_PATH = os.path.join(ROOT_DIR, 'assets', 'logo.png')
 ICON_PATH = os.path.join(ROOT_DIR, 'assets', 'icon.ico')
 COMMAND_ICON = os.path.join(ROOT_DIR, 'assets', 'command.ico')
