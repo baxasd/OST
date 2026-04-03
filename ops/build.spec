@@ -21,7 +21,6 @@ st_datas = st_all_datas + copy_metadata('plotly')
 shared_datas = [
     (os.path.join(project_root, 'assets'), 'assets'),
     (os.path.join(project_root, 'core'), 'core'),
-    (os.path.join(project_root, 'settings-template.ini'), '.')
 ]
 
 base_hidden = mp_hidden + rs_hidden + cv_hidden + ['pyarrow.vendored.version', 'zmq']
@@ -134,7 +133,7 @@ exe_stu = EXE( #type: ignore
 #   BUILD 4: KEYGEN
 # =============================================================================
 a_keygen = Analysis( #type: ignore
-    [os.path.join(project_root, 'keys.py')],
+    [os.path.join(project_root, 'keygen.py')],
     pathex=[project_root],
     datas=[], # No special data needed for keygen
     hiddenimports=['configparser'],
