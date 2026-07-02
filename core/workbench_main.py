@@ -78,7 +78,7 @@ def create_kinematic_plot(df, x_col, y_cols, names, colors, title, show_env=Fals
 _FATIGUE_PALETTE = ["#005FB8", "#D83B01", "#8764B8", "#107C10", "#CA5010", "#5C2E91", "#038387"]
 
 def create_fatigue_plot(fc, value_col, baseline_window=None, exclude_regions=None,
-                        title="Fatigue vs Baseline", ylabel="z-score"):
+                        title="Posture Drift From Baseline", ylabel="Δ from baseline (°)"):
     """Per-bin deviation-from-baseline curve, one line per metric, with the
     baseline window and excluded regions shaded (x axis in minutes)."""
     fig = go.Figure()
@@ -332,9 +332,10 @@ def main():
                 st.warning("Recording is under a minute — baseline/fatigue analysis needs a longer session.")
             else:
                 st.caption(
-                    "Build an **unfatigued baseline** from a settled window, exclude the "
-                    "treadmill warm-up (and any glitches), and compare the rest of the "
-                    "session against that baseline."
+                    "**Fatigue = drift from a fresh baseline.** Pick a settled, "
+                    "unfatigued window early in the run; the app then shows how far "
+                    "your posture angles have moved from that baseline over time, in "
+                    "degrees (e.g. *trunk lean +3° = leaning further forward as you tire*)."
                 )
 
                 # ---- Window controls (minute-based, treadmill-protocol friendly) ----
@@ -374,14 +375,18 @@ def main():
                         with ac1:
                             bin_label = st.selectbox("Comparison bin", ["1 min", "30 s", "2 min"], index=0)
                             value_label = st.radio(
-                                "Deviation metric", ["z-score", "% change"], horizontal=True,
-                                help="z-score = (bin mean − baseline mean) / baseline SD; "
-                                     "robust when the baseline mean is near zero.",
+                                "Deviation metric", ["Δ (degrees)", "% change"], horizontal=True,
+                                help="Δ = bin-average minus your fresh baseline, in the metric's "
+                                     "own units (degrees). Positive trunk-lean Δ means leaning "
+                                     "further forward as you tire.",
                             )
                         with ac2:
                             metrics_sel = st.multiselect(
-                                "Metrics to track", logic.ANGLE_METRICS + ['com_x'],
-                                default=logic.ANGLE_METRICS,
+                                "Metrics to track", logic.ANGLE_METRICS,
+                                default=logic.RELIABLE_FATIGUE_METRICS,
+                                help="Trunk and head lean are the reliable sagittal-plane markers. "
+                                     "Left/right shoulder & elbow angles are less trustworthy on a "
+                                     "single side camera — the far limb is occluded and estimated.",
                             )
                         st.caption("Extra excluded regions in minutes (e.g. tracking glitches mid-run)")
                         custom_excl = st.data_editor(
@@ -402,13 +407,17 @@ def main():
                         exclude_regions.append((float(r["Start (min)"]) * 60.0, float(r["End (min)"]) * 60.0))
                 baseline_window = (baseline_min[0] * 60.0, baseline_min[1] * 60.0)
                 bin_sec = {"1 min": 60.0, "30 s": 30.0, "2 min": 120.0}[bin_label]
-                value_col = "z_score" if value_label == "z-score" else "pct_change"
+                value_col = "delta" if value_label == "Δ (degrees)" else "pct_change"
 
                 # ---- Compute baseline + fatigue curve ----
+                # Require each bin to be at least half-full so a thin sliver at an
+                # exclusion boundary or the session tail can't produce a wild Δ.
+                fps = derived.get('fps', 30.0) or 30.0
+                min_frames = max(1, int(0.5 * bin_sec * fps))
                 ts_w = ts_df.assign(included=logic.build_time_mask(ts_df['timestamp'], exclude_regions))
                 n_incl = int(ts_w['included'].sum())
                 baseline = logic.compute_baseline(ts_w, baseline_window, metrics_sel)
-                fatigue = logic.compute_fatigue_curve(ts_w, baseline, metrics_sel, bin_sec)
+                fatigue = logic.compute_fatigue_curve(ts_w, baseline, metrics_sel, bin_sec, min_frames)
 
                 if not room:
                     st.error("Warm-up and cool-down leave no room for a baseline window. Reduce them.")
@@ -433,28 +442,31 @@ def main():
 
                     # Fatigue curve
                     with st.container(border=True):
-                        ylabel = "z-score (σ from baseline)" if value_col == "z_score" else "% change from baseline"
+                        ylabel = "Δ from baseline (°)" if value_col == "delta" else "% change from baseline"
                         st.plotly_chart(
                             create_fatigue_plot(fatigue, value_col, baseline_window, exclude_regions,
-                                                title="Deviation From Baseline Over Time", ylabel=ylabel),
+                                                title="Posture Drift From Baseline", ylabel=ylabel),
                             use_container_width=True,
                         )
 
-                    # End-vs-baseline summary (last bin per metric)
+                    # End-vs-baseline summary (last full bin per metric), in real units
                     last = fatigue.sort_values('time_min').groupby('metric').tail(1).set_index('metric')
-                    summary = baseline.join(last[['time_min', 'mean', 'delta', 'pct_change', 'z_score']])
+                    summary = baseline.join(last[['mean', 'delta', 'pct_change']])
+                    disp = summary.rename(columns={
+                        'baseline_mean': 'Baseline (°)', 'baseline_std': 'Baseline SD',
+                        'n': 'Baseline n', 'mean': 'End (°)', 'delta': 'Δ (°)', 'pct_change': 'Δ %',
+                    })
                     with st.container(border=True):
                         sc1, sc2 = st.columns([0.7, 0.3], vertical_alignment="bottom")
-                        sc1.markdown("**End vs Baseline** — final bin compared to the unfatigued reference")
+                        sc1.markdown("**End vs Baseline** — your fresh baseline vs the final full bin, in degrees")
                         sc2.download_button(
                             "Export Fatigue CSV", fatigue.to_csv(index=False).encode('utf-8'),
                             "fatigue_curve.csv", "text/csv", use_container_width=True,
                         )
                         st.dataframe(
-                            summary.style.format({
-                                "baseline_mean": "{:.2f}", "baseline_std": "{:.2f}", "n": "{:.0f}",
-                                "time_min": "{:.1f}", "mean": "{:.2f}", "delta": "{:+.2f}",
-                                "pct_change": "{:+.1f}%", "z_score": "{:+.2f}",
+                            disp.style.format({
+                                "Baseline (°)": "{:.1f}", "Baseline SD": "{:.1f}", "Baseline n": "{:.0f}",
+                                "End (°)": "{:.1f}", "Δ (°)": "{:+.1f}", "Δ %": "{:+.1f}%",
                             }, na_rep="—"),
                             use_container_width=True,
                         )

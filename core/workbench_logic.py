@@ -314,6 +314,14 @@ def compute_all_metrics(f: Frame, torso_len: float = None) -> dict:
 # Headline angle metrics (degrees) emitted by compute_all_metrics.
 ANGLE_METRICS = ['trunk_lean', 'head_lean', 'l_sho', 'r_sho', 'l_elb', 'r_elb']
 
+# Angles that are trustworthy on a single side-mounted (sagittal) camera and have
+# a clear fatigue direction — the Fatigue Analysis default. Trunk lean is the
+# primary validated running-fatigue marker (runners lean further forward as they
+# tire); head lean is a postural secondary. The left/right shoulder & elbow angles
+# are intentionally excluded from the default because the far limb is occluded and
+# estimated in profile, so their left/right split is unreliable.
+RELIABLE_FATIGUE_METRICS = ['trunk_lean', 'head_lean']
+
 def generate_analysis_report(session):
     torso_len = session_torso_length(session)
     data = []
@@ -419,32 +427,39 @@ def compute_baseline(ts_df: pd.DataFrame, baseline_window, metrics) -> pd.DataFr
     })
 
 def compute_fatigue_curve(ts_df: pd.DataFrame, baseline: pd.DataFrame, metrics,
-                          bin_sec: float = 60.0) -> pd.DataFrame:
-    """Per-bin (default per-minute) deviation of each metric from baseline.
+                          bin_sec: float = 60.0, min_frames: int = 1) -> pd.DataFrame:
+    """Per-bin (default per-minute) deviation of each metric from baseline, in the
+    metric's own units.
 
     Returns a tidy DataFrame with columns:
-      time_min, metric, mean, delta, pct_change, z_score
-    where delta = bin_mean - baseline_mean, pct_change = 100*delta/baseline_mean
-    (guarded when baseline ~ 0), and z_score = delta / baseline_std.
+      time_min, metric, mean, delta, pct_change, n
+    where delta = bin_mean - baseline_mean (real units, e.g. degrees) and
+    pct_change = 100*delta/baseline_mean (guarded when baseline ~ 0). Bins with
+    fewer than `min_frames` samples for a metric are dropped so a thin sliver at an
+    exclusion boundary or the tail of the session can't produce a wild deviation.
     """
     df = ts_df[ts_df['included']] if 'included' in ts_df.columns else ts_df
     present = [c for c in metrics if c in df.columns]
     if df.empty or not present:
-        return pd.DataFrame(columns=['time_min', 'metric', 'mean', 'delta', 'pct_change', 'z_score'])
+        return pd.DataFrame(columns=['time_min', 'metric', 'mean', 'delta', 'pct_change', 'n'])
     binid = np.floor(df['timestamp'].to_numpy() / bin_sec).astype(int)
-    grouped = df.assign(_bin=binid).groupby('_bin')[present].mean()
+    grouped = df.assign(_bin=binid).groupby('_bin')
+    means  = grouped[present].mean()
+    counts = grouped[present].count()
     rows = []
     for metric in present:
         b_mean = float(baseline.loc[metric, 'baseline_mean']) if metric in baseline.index else float('nan')
-        b_std  = float(baseline.loc[metric, 'baseline_std'])  if metric in baseline.index else float('nan')
-        for bin_idx, val in grouped[metric].items():
+        for bin_idx in means.index:
+            n = int(counts.loc[bin_idx, metric])
+            val = means.loc[bin_idx, metric]
+            if n < max(1, min_frames) or not np.isfinite(val):
+                continue
             delta = val - b_mean
             pct = 100.0 * delta / b_mean if np.isfinite(b_mean) and abs(b_mean) > 1e-9 else float('nan')
-            z = delta / b_std if np.isfinite(b_std) and b_std > 1e-9 else float('nan')
             rows.append({
                 'time_min': bin_idx * bin_sec / 60.0,
                 'metric': metric, 'mean': float(val),
-                'delta': float(delta), 'pct_change': float(pct), 'z_score': float(z),
+                'delta': float(delta), 'pct_change': float(pct), 'n': n,
             })
     return pd.DataFrame(rows)
 
